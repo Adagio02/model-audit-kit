@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "modelaudit"
+version = "0.1.0"
+description = "Independent backtest validation: leakage, costs, walk-forward, overfitting, risk and a gate verdict."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["pandas>=2.0", "numpy>=1.24", "scipy>=1.10", "matplotlib>=3.7"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+modelaudit = "modelaudit.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q --basetemp=pytest-temp"
+
+[tool.ruff]
+line-length = 110

@@ -1,0 +1,10 @@
+{
+  "cost_bps": 10,
+  "min_net_sharpe": 0.5,
+  "max_drawdown": -0.25,
+  "folds": 5,
+  "min_positive_fold_fraction": 0.6,
+  "n_trials": 10,
+  "min_deflated_sharpe_prob": 0.95,
+  "benchmark_ticker": "SPY"
+}

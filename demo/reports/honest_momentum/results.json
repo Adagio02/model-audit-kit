@@ -1,0 +1,178 @@
+{
+  "strategy": "honest_momentum",
+  "verdict": "PASS",
+  "headline": {
+    "gross_sharpe": 1.287,
+    "net_sharpe": 1.238,
+    "net_total_return": 1.6836,
+    "max_drawdown": -0.1024
+  },
+  "checks": [
+    {
+      "key": "data_integrity",
+      "title": "Data integrity",
+      "status": "PASS",
+      "summary": "No integrity problems found.",
+      "metrics": {
+        "tickers": 81,
+        "dates": 2609,
+        "start": "2015-01-01",
+        "end": "2024-12-31",
+        "tickers_entering": 10,
+        "tickers_leaving": 10,
+        "missing_fraction": 0.0,
+        "large_moves": 0,
+        "duplicate_price_rows": 0,
+        "duplicate_position_rows": 0
+      }
+    },
+    {
+      "key": "lookahead",
+      "title": "Look-ahead / leakage (delay test)",
+      "status": "PASS",
+      "summary": "Performance decays gradually with execution delay, as expected for a genuine signal.",
+      "metrics": {
+        "sharpe_by_delay": {
+          "1": 1.287,
+          "2": 1.299,
+          "3": 1.321,
+          "5": 1.242
+        },
+        "decay_ratio_delay2_over_delay1": 1.01
+      }
+    },
+    {
+      "key": "costs",
+      "title": "Transaction-cost realism",
+      "status": "PASS",
+      "summary": "Net Sharpe 1.24 at 10 bps (gate 0.5); daily turnover 1.6%; break-even cost 259.8 bps.",
+      "metrics": {
+        "daily_turnover": 0.0157,
+        "annual_turnover": 3.95,
+        "breakeven_cost_bps": 259.84,
+        "net_sharpe_at_gate_cost": 1.238,
+        "sharpe_by_cost_bps": {
+          "0": 1.287,
+          "5": 1.262,
+          "10": 1.238,
+          "25": 1.164,
+          "50": 1.04
+        }
+      }
+    },
+    {
+      "key": "walk_forward",
+      "title": "Stability across time (walk-forward windows)",
+      "status": "PASS",
+      "summary": "100% of 5 sequential windows are profitable after costs (gate 60%); worst window Sharpe 0.40.",
+      "metrics": {
+        "positive_fraction": 1.0,
+        "worst_fold_sharpe": 0.396,
+        "folds": [
+          {
+            "start": "2015-01-02",
+            "end": "2016-12-30",
+            "sharpe": 1.237,
+            "return": 0.19
+          },
+          {
+            "start": "2017-01-02",
+            "end": "2019-01-01",
+            "sharpe": 2.003,
+            "return": 0.4068
+          },
+          {
+            "start": "2019-01-02",
+            "end": "2020-12-30",
+            "sharpe": 0.575,
+            "return": 0.0881
+          },
+          {
+            "start": "2020-12-31",
+            "end": "2022-12-30",
+            "sharpe": 0.396,
+            "return": 0.0639
+          },
+          {
+            "start": "2023-01-02",
+            "end": "2024-12-31",
+            "sharpe": 1.946,
+            "return": 0.3847
+          }
+        ]
+      }
+    },
+    {
+      "key": "deflated_sharpe",
+      "title": "Overfitting (deflated Sharpe ratio)",
+      "status": "PASS",
+      "summary": "Probability the edge is real after 10 declared trial(s): 99.2% (gate 95%).",
+      "metrics": {
+        "n_trials": 10,
+        "observations": 2608,
+        "annualized_sharpe": 1.238,
+        "skew": 0.058,
+        "kurtosis": 3.154,
+        "luck_threshold_annualized": 0.489,
+        "probability_real": 0.992
+      }
+    },
+    {
+      "key": "risk",
+      "title": "Drawdown and tail risk",
+      "status": "PASS",
+      "summary": "Maximum drawdown -10.2% (gate -25%); worst day -1.7%.",
+      "metrics": {
+        "max_drawdown": -0.1024,
+        "worst_day": -0.0174
+      }
+    },
+    {
+      "key": "benchmark",
+      "title": "Value over a simple benchmark",
+      "status": "PASS",
+      "summary": "Information ratio vs SPY: 0.27; beta -0.00; strategy Sharpe 1.24 vs benchmark 0.32.",
+      "metrics": {
+        "benchmark": "SPY",
+        "information_ratio": 0.267,
+        "beta": -0.005,
+        "benchmark_sharpe": 0.315
+      }
+    }
+  ],
+  "gates": {
+    "periods_per_year": 252,
+    "cost_bps": 10,
+    "cost_grid_bps": [
+      0,
+      5,
+      10,
+      25,
+      50
+    ],
+    "min_net_sharpe": 0.5,
+    "max_drawdown": -0.25,
+    "folds": 5,
+    "min_positive_fold_fraction": 0.6,
+    "n_trials": 10,
+    "min_deflated_sharpe_prob": 0.95,
+    "lookahead_max_sharpe": 4.0,
+    "lookahead_min_decay_ratio": 0.3,
+    "max_abs_daily_move": 0.5,
+    "max_missing_fraction": 0.05,
+    "benchmark_ticker": "SPY",
+    "labels": {}
+  },
+  "manifest": {
+    "tool": "modelaudit 0.1.0",
+    "generated_utc": "2026-11-13T18:55:13+00:00",
+    "python": "3.13.16",
+    "pandas": "3.0.5",
+    "inputs_sha256": {
+      "prices.csv": "13946a594d4b6b8d0ffef97bea3d8aa8ebf8ef8692bb7ac1098bbca0a96dd4eb",
+      "positions_honest_momentum.csv": "cd99dd0323d0d93f1f3ddf351f56c4d5673a3faa51b3bb45da08b5aea678d4fd",
+      "gates.json": "710cd60fb477638d8bfdf177088e640632fe95303d95dfbda92646b48a9beea6"
+    },
+    "contract": "Weights are decided at the close of each date using only information available then, and earn the next period's return."
+  }
+}
