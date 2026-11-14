@@ -165,12 +165,12 @@
   },
   "manifest": {
     "tool": "modelaudit 0.1.0",
-    "generated_utc": "2026-11-13T18:55:13+00:00",
-    "python": "3.13.16",
-    "pandas": "3.0.5",
+    "generated_utc": "2026-11-14T00:03:44+00:00",
+    "python": "3.12.10",
+    "pandas": "3.1.1",
     "inputs_sha256": {
-      "prices.csv": "13946a594d4b6b8d0ffef97bea3d8aa8ebf8ef8692bb7ac1098bbca0a96dd4eb",
-      "positions_honest_momentum.csv": "cd99dd0323d0d93f1f3ddf351f56c4d5673a3faa51b3bb45da08b5aea678d4fd",
+      "prices.csv": "d98dcac709e7420c4635927a445a7524f81a3ca5d5d02ebd75860164fa74fa4e",
+      "positions_honest_momentum.csv": "7542bbb9c81ebb45c3f2c16f278531b224ac77c5db107fa03370f8ddf31189bd",
       "gates.json": "710cd60fb477638d8bfdf177088e640632fe95303d95dfbda92646b48a9beea6"
     },
     "contract": "Weights are decided at the close of each date using only information available then, and earn the next period's return."

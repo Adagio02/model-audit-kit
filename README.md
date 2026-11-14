@@ -30,12 +30,13 @@ Command line anywhere: `modelaudit run --prices p.csv --positions w.csv --gates 
 ## The demo
 
 `demo/make_demo.py` builds a synthetic market (80 stocks 2015-2024, with listings,
-delistings and a benchmark) and three strategies that show what the audit catches:
+delistings and a benchmark) and four strategies that show what the audit catches:
 
 | Strategy | Verdict | Why |
 |---|---|---|
 | honest_momentum | PASS | Weekly momentum, decays gradually with delay, survives costs |
 | leaky_momentum | FAIL | Uses tomorrow's return by mistake: Sharpe 5.6 falls to 1.8 with one day of delay |
+| leaky_momentum_fixed | PASS | Same strategy with the bug fixed (`rets.shift(-1)` -> `rets`): Sharpe 1.68, the real edge |
 | high_turnover_reversal | FAIL | Real but tiny edge: Sharpe 1.6 before costs, 0.07 after 10 bps; 43% drawdown |
 
 The data is synthetic on purpose: nobody's real strategy is exposed, and the "right answer" is known.

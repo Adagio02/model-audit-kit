@@ -79,12 +79,18 @@ def main() -> None:
     leaky_score = momentum.rank(axis=1, pct=True) + 0.6 * rets.shift(-1).rank(axis=1, pct=True)
     leaky = long_short(leaky_score, rebalance_every=1, tradable=closes.notna())
 
+    # 2b) Leak fixed: the same score with the bug removed. rets.shift(-1) became rets, the return
+    #     already known at today's close. The audit then shows what the strategy is really worth.
+    fixed_score = momentum.rank(axis=1, pct=True) + 0.6 * rets.rank(axis=1, pct=True)
+    fixed = long_short(fixed_score, rebalance_every=1, tradable=closes.notna())
+
     # 3) Cost-fragile: 1-day reversal traded every day. Looks fine before costs, not after.
     reversal = -rets
     fragile = long_short(reversal, rebalance_every=1, quantile=0.1, tradable=closes.notna())
 
     prices.to_csv(OUT / "prices.csv", index=False, float_format="%.4f")
     for name, weights in (("honest_momentum", honest), ("leaky_momentum", leaky),
+                          ("leaky_momentum_fixed", fixed),
                           ("high_turnover_reversal", fragile)):
         to_long(weights).to_csv(OUT / f"positions_{name}.csv", index=False, float_format="%.6f")
     print(f"Demo data written to {OUT}")
