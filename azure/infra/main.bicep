@@ -28,6 +28,9 @@ param deployerLogin string
 @description('Your public IP, so sqlcmd can reach the SQL server from your PC. Empty = no rule.')
 param clientIp string = ''
 
+@description('Region for Azure SQL, if the main region is not accepting new SQL servers.')
+param sqlLocation string = location
+
 @description('Create a Microsoft Foundry (Azure OpenAI) resource and model deployment.')
 param deployFoundry bool = true
 
@@ -197,7 +200,7 @@ resource foundryKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (d
 
 resource sql 'Microsoft.Sql/servers@2023-08-01-preview' = {
   name: names.sql
-  location: location
+  location: sqlLocation
   properties: {
     minimalTlsVersion: '1.2'
     publicNetworkAccess: 'Enabled'
@@ -215,7 +218,7 @@ resource sql 'Microsoft.Sql/servers@2023-08-01-preview' = {
 resource db 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
   parent: sql
   name: names.db
-  location: location
+  location: sqlLocation
   sku: { name: 'GP_S_Gen5', tier: 'GeneralPurpose', family: 'Gen5', capacity: 2 }
   properties: {
     useFreeLimit: true                       // free offer: 100k vCore-seconds + 32 GB a month

@@ -13,7 +13,8 @@ param(
     [string]$AlertEmail = "",
     [int]$MonthlyBudget = 10,
     [switch]$SkipFoundry,
-    [string]$FoundryLocation = ""
+    [string]$FoundryLocation = "",
+    [string]$SqlLocation = ""
 )
 $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -47,6 +48,7 @@ Step "Deploying infrastructure (Bicep) - takes about 5 minutes"
 $params = @("prefix=$Prefix", "deployerObjectId=$($me.id)", "deployerLogin=$($me.upn)", "clientIp=$ip",
             "deployFoundry=$((-not $SkipFoundry).ToString().ToLower())", "alertEmail=$AlertEmail", "monthlyBudget=$MonthlyBudget")
 if ($FoundryLocation) { $params += "foundryLocation=$FoundryLocation" }
+if ($SqlLocation) { $params += "sqlLocation=$SqlLocation" }
 $out = az deployment group create -g $ResourceGroup -n model-audit -f azure\infra\main.bicep `
     --parameters $params --query properties.outputs -o json | ConvertFrom-Json
 Check "The infrastructure deployment"
