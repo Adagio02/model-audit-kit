@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "modelaudit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Independent backtest validation: leakage, costs, walk-forward, overfitting, risk and a gate verdict."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,6 +12,8 @@ dependencies = ["pandas>=2.0", "numpy>=1.24", "scipy>=1.10", "matplotlib>=3.7"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
+# Azure mode: Blob Storage, Azure SQL (mssql-python), Microsoft Foundry / Azure OpenAI
+azure = ["azure-identity>=1.17", "azure-storage-blob>=12.20", "mssql-python>=1.0", "openai>=1.60"]
 
 [project.scripts]
 modelaudit = "modelaudit.cli:main"

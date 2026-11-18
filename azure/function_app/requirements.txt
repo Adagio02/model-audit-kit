@@ -1,0 +1,11 @@
+# Installed by the remote build when you publish. The modelaudit package itself is copied into
+# this folder by azure/scripts/deploy.ps1, so it is not listed here.
+azure-functions
+azure-identity>=1.17
+azure-storage-blob>=12.20
+mssql-python>=1.0
+openai>=1.60
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7

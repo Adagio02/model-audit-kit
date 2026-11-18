@@ -27,6 +27,17 @@ Audit a client: put `prices.csv` and `positions.csv` (and optionally `gates.json
 Command line anywhere: `modelaudit run --prices p.csv --positions w.csv --gates g.json --name X --out folder`
 (exit code 0 = PASS/CONDITIONAL, 2 = FAIL, so it can run in CI).
 
+## Run it on Azure
+
+The same engine runs as an event-driven Azure pipeline: upload a batch to Blob Storage, an Azure
+Function audits it, results land in Azure SQL, Power BI/Fabric report on them, and a Microsoft
+Foundry model explains each failed check in plain English. Full plan: [docs/07-AZURE.md](docs/07-AZURE.md).
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1 -Azure
+    powershell -ExecutionPolicy Bypass -File .\azure\scripts\run_local_pipeline.ps1    # try it with no Azure account
+    az login
+    powershell -ExecutionPolicy Bypass -File .\azure\scripts\deploy.ps1 -ResourceGroup rg-model-audit -AlertEmail you@example.com
+
 ## The demo
 
 `demo/make_demo.py` builds a synthetic market (80 stocks 2015-2024, with listings,
@@ -44,6 +55,8 @@ The data is synthetic on purpose: nobody's real strategy is exposed, and the "ri
 ## Folders
 
     src/modelaudit/   the engine (checks, report, CLI)
+    src/modelaudit/cloud/  pipeline shared by CLI, Azure Function and Fabric (storage, SQL, AI explainer)
+    azure/            Function app, Bicep, SQL schema, deploy scripts, Fabric/Power BI/Copilot Studio guides
     demo/             synthetic market, gates and sample reports
     templates/        default gates, client data spec
     docs/             guides
