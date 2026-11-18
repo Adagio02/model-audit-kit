@@ -187,6 +187,7 @@ resource foundryKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (d
   parent: vault
   name: 'foundry-api-key'
   properties: {
+    #disable-next-line BCP422
     value: deployFoundry ? foundry.listKeys().key1 : ''
     contentType: 'Microsoft Foundry API key for the audit explainer'
   }

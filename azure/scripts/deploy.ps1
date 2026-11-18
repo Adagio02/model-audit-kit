@@ -21,6 +21,7 @@ Set-Location $Root
 $Py = ".\.venv\Scripts\python.exe"
 
 function Step($text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
+function Check($what) { if ($LASTEXITCODE -ne 0) { throw "$what failed (see the error above). Fix it and re-run; every step is safe to repeat." } }
 function Need($cmd, $hint) { if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) { throw "$cmd not found. $hint" } }
 
 Need az   "Install the Azure CLI: winget install Microsoft.AzureCLI"
@@ -29,6 +30,7 @@ if (-not (Test-Path $Py)) { throw "Run .\scripts\setup.ps1 -Azure first." }
 
 Step "Checking your Azure sign-in"
 $me = az ad signed-in-user show --query "{id:id, upn:userPrincipalName}" -o json | ConvertFrom-Json
+Check "Reading your signed-in user"
 $sub = az account show --query name -o tsv
 Write-Host "Signed in as $($me.upn), subscription '$sub'"
 $ip = (Invoke-RestMethod -Uri "https://api.ipify.org")
@@ -39,13 +41,15 @@ foreach ($ns in "Microsoft.Web", "Microsoft.Sql", "Microsoft.KeyVault", "Microso
 
 Step "Creating resource group $ResourceGroup in $Location"
 az group create -n $ResourceGroup -l $Location --only-show-errors | Out-Null
+Check "Creating the resource group"
 
 Step "Deploying infrastructure (Bicep) - takes about 5 minutes"
 $params = @("prefix=$Prefix", "deployerObjectId=$($me.id)", "deployerLogin=$($me.upn)", "clientIp=$ip",
-            "deployFoundry=$(-not $SkipFoundry)".ToLower(), "alertEmail=$AlertEmail", "monthlyBudget=$MonthlyBudget")
+            "deployFoundry=$((-not $SkipFoundry).ToString().ToLower())", "alertEmail=$AlertEmail", "monthlyBudget=$MonthlyBudget")
 if ($FoundryLocation) { $params += "foundryLocation=$FoundryLocation" }
 $out = az deployment group create -g $ResourceGroup -n model-audit -f azure\infra\main.bicep `
     --parameters $params --query properties.outputs -o json | ConvertFrom-Json
+Check "The infrastructure deployment"
 $app = $out.functionAppName.value
 $sql = $out.sqlServerFqdn.value
 $dbName = $out.sqlDatabaseName.value
@@ -54,7 +58,9 @@ Write-Host "Function App: $app`nSQL: $sql/$dbName`nStorage: $storage`nKey Vault:
 
 Step "Creating SQL tables and views, and granting the Function's identity access"
 & $Py azure\scripts\apply_sql.py --server $sql --database $dbName --file azure\sql\schema.sql
+Check "Creating the SQL schema"
 & $Py azure\scripts\apply_sql.py --server $sql --database $dbName --file azure\sql\grant_function_identity.sql --var "APP_NAME=$app"
+Check "Granting SQL access"
 
 Step "Packaging and publishing the function code (remote build)"
 $pkg = "azure\function_app\modelaudit"
@@ -62,7 +68,7 @@ if (Test-Path $pkg) { Remove-Item $pkg -Recurse -Force }
 Copy-Item src\modelaudit $pkg -Recurse
 Get-ChildItem $pkg -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
 Push-Location azure\function_app
-try { func azure functionapp publish $app --python } finally { Pop-Location }
+try { func azure functionapp publish $app --python; Check "Publishing the function code" } finally { Pop-Location }
 
 Step "Connecting Blob Storage events to the function (Event Grid)"
 $key = $null
@@ -83,6 +89,7 @@ az eventgrid system-topic event-subscription create -g $ResourceGroup --system-t
     --endpoint-type webhook --endpoint $endpoint --included-event-types Microsoft.Storage.BlobCreated `
     --subject-begins-with /blobServices/default/containers/audit-inputs/ --subject-ends-with submit.json `
     --only-show-errors | Out-Null
+Check "Creating the Event Grid subscription"
 
 Step "Done"
 Write-Host @"
