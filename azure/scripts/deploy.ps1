@@ -79,30 +79,10 @@ for ($i = 0; $i -lt 12 -and -not $key; $i++) {
     if (-not $key) { Write-Host "  waiting for the function host to start..."; Start-Sleep 10 }
 }
 if (-not $key) { throw "No blobs_extension key yet. Wait a minute and re-run this script." }
-$hostName = az functionapp show -g $ResourceGroup -n $app --query defaultHostName -o tsv
-$endpoint = "https://$hostName/runtime/webhooks/blobs?functionName=Host.Functions.AuditOnSubmit&code=$key"
 $topic = "$Prefix-storage-events"
-# "list" + filter instead of "show": show writes an error when the topic doesn't exist yet,
-# which Windows PowerShell 5.1 turns into a terminating error under ErrorActionPreference=Stop.
-$existing = az eventgrid system-topic list -g $ResourceGroup --query "[?name=='$topic'].name" -o tsv
-Check "Listing Event Grid topics"
-if (-not $existing) {
-    az eventgrid system-topic create -g $ResourceGroup -n $topic -l $Location `
-        --topic-type Microsoft.Storage.StorageAccounts --source $out.storageAccountId.value --only-show-errors | Out-Null
-    Check "Creating the Event Grid topic"
-}
-# The endpoint contains '&', which cmd.exe (az runs through az.cmd) would treat as a command separator.
-# Azure CLI reads an argument from a file when it starts with '@', so pass it that way.
-$endpointFile = New-TemporaryFile
-[IO.File]::WriteAllText($endpointFile.FullName, $endpoint)
-az eventgrid system-topic event-subscription create -g $ResourceGroup --system-topic-name $topic -n audit-submit `
-    --endpoint-type webhook --endpoint "@$($endpointFile.FullName)" --included-event-types Microsoft.Storage.BlobCreated `
-    --subject-begins-with /blobServices/default/containers/audit-inputs/ --subject-ends-with submit.json `
-    --only-show-errors | Out-Null
-$subscriptionExit = $LASTEXITCODE
-Remove-Item $endpointFile
-$LASTEXITCODE = $subscriptionExit
-Check "Creating the Event Grid subscription"
+az deployment group create -g $ResourceGroup -n model-audit-events -f azure\infra\eventgrid.bicep `
+    --parameters functionAppName=$app storageAccountName=$storage topicName=$topic --only-show-errors | Out-Null
+Check "Connecting storage events to the function"
 
 Step "Done"
 Write-Host @"
