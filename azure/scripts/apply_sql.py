@@ -37,10 +37,10 @@ def main() -> int:
 
     variables = dict(v.split("=", 1) for v in args.var)
     conn_str = (f"Server=tcp:{args.server},1433;Database={args.database};Encrypt=yes;"
-                "TrustServerCertificate=no;Connection Timeout=60;Authentication=ActiveDirectoryDefault")
+                "TrustServerCertificate=no;ConnectRetryCount=3;ConnectRetryInterval=10;Authentication=ActiveDirectoryDefault")
     for attempt in range(1, 6):  # the serverless database may be paused; it resumes on first connect
         try:
-            conn = mssql_python.connect(conn_str)
+            conn = mssql_python.connect(conn_str, timeout=60)
             break
         except mssql_python.Error as exc:
             if attempt == 5:

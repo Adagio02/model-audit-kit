@@ -100,14 +100,14 @@ class AzureSqlSink(SqlSink):
 
     def __init__(self, server: str, database: str, authentication: str = "ActiveDirectoryMSI"):
         self.conn_str = (f"Server=tcp:{server},1433;Database={database};Encrypt=yes;"
-                         f"TrustServerCertificate=no;Connection Timeout=60;Authentication={authentication}")
+                         f"TrustServerCertificate=no;ConnectRetryCount=3;ConnectRetryInterval=10;Authentication={authentication}")
 
     def connect(self, attempts: int = 4):
         import mssql_python
 
         for attempt in range(1, attempts + 1):
             try:
-                return mssql_python.connect(self.conn_str)
+                return mssql_python.connect(self.conn_str, timeout=60)
             except mssql_python.Error as exc:
                 if attempt == attempts:
                     raise
