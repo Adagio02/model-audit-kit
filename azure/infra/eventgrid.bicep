@@ -7,6 +7,9 @@ param functionAppName string
 param storageAccountName string
 param topicName string
 
+@description('Must be the storage account\'s region (deploy.ps1 puts storage in the resource group\'s region).')
+param location string = resourceGroup().location
+
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
 }
@@ -17,7 +20,7 @@ resource func 'Microsoft.Web/sites@2024-04-01' existing = {
 
 resource topic 'Microsoft.EventGrid/systemTopics@2022-06-15' = {
   name: topicName
-  location: storage.location
+  location: location
   properties: {
     source: storage.id
     topicType: 'Microsoft.Storage.StorageAccounts'
