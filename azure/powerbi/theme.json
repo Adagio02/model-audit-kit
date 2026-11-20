@@ -1,0 +1,13 @@
+{
+  "name": "Model Audit Kit",
+  "dataColors": ["#1f6f8b", "#1e7b4f", "#a86a00", "#b23b3b", "#7a8794", "#5b6776", "#9aa5b1", "#3f8fb0"],
+  "good": "#1e7b4f",
+  "neutral": "#a86a00",
+  "bad": "#b23b3b",
+  "maximum": "#b23b3b",
+  "center": "#a86a00",
+  "minimum": "#1e7b4f",
+  "background": "#ffffff",
+  "foreground": "#1d2733",
+  "tableAccent": "#1f6f8b"
+}

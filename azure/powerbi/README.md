@@ -1,48 +1,66 @@
 # Power BI dashboard: audit results
 
-## Data source (pick one)
+Everything you type is in this folder, so the dashboard can be rebuilt the same way each time:
+
+| File | What it is |
+|---|---|
+| `queries.pq` | Power Query (M) for each table, for Azure SQL and for the local CSVs |
+| `measures.dax` | All measures, plus the date table |
+| `theme.json` | Colours that match the HTML report (PASS green, CONDITIONAL amber, FAIL red, ERROR grey) |
+
+## 1. Data source
+
+Both sources give the same four tables with the same columns, so you can build the report on your PC first
+and switch it to Azure later without changing anything else.
 
 | Source | When | How |
 |---|---|---|
-| Local CSVs | No Azure yet | Run `azure\scripts\run_local_pipeline.ps1`, then in Power BI Desktop use *Get data > Text/CSV* on `local-cloud\powerbi\*.csv` |
-| Azure SQL | Phase 1 deployed | *Get data > Azure SQL database*, server `<server>.database.windows.net`, database `auditdb`, sign in with your *Microsoft account* (Entra). Import the views `audit.v_runs`, `audit.v_findings`, `audit.v_check_daily` |
-| Fabric Lakehouse | Phase 2 Route A | Semantic model on `audit_runs`, `audit_check_results`, `audit_explanations` (Direct Lake) |
+| Local CSVs | No Azure yet | Run `azure\scripts\run_local_pipeline.ps1`. It writes `local-cloud\powerbi\v_*.csv`. Create a text parameter `CsvFolder` with that folder's full path and use the CSV queries in `queries.pq` |
+| Azure SQL | After `deploy.ps1` | Create the parameters `SqlServer` (`<server>.database.windows.net`) and `SqlDatabase` (`auditdb`) and use the SQL queries. Sign in with *Microsoft account* (Entra). For someone else's account, deploy with `-ReaderLogin their@tenant.onmicrosoft.com`; it can read only the four views |
+| Fabric Lakehouse | Phase 2 Route A | A Direct Lake semantic model on `audit_runs`, `audit_check_results`, `audit_explanations` |
 
-Relationships: `runs[run_id]` 1 → * `check_results[run_id]`, and `check_results (run_id, check_key)`
-→ `explanations`. In Power BI, add a calculated key column `run_id & "|" & check_key` to both tables.
-The SQL views already join these, so with Azure SQL you mostly use `v_findings`.
+Tables (name each query like this):
 
-## Measures (DAX)
+| Query | View | One row per |
+|---|---|---|
+| `runs` | `v_runs` | audit run (client + batch), with verdict and headline numbers |
+| `findings` | `v_findings` | flagged check (WARN/FAIL), with explanation and suggested action |
+| `check_daily` | `v_check_daily` | check per day, with pass/warn/fail counts |
+| `run_metrics` | `v_run_metrics` | run, with the key number from each check (delay Sharpe, break-even cost, leverage, ...) |
 
-```DAX
-Runs = COUNTROWS ( runs )
-Pass Rate = DIVIDE ( CALCULATE ( [Runs], runs[verdict] = "PASS" ), [Runs] )
-Fail Rate = DIVIDE ( CALCULATE ( [Runs], runs[verdict] = "FAIL" ), [Runs] )
-Error Runs = CALCULATE ( [Runs], runs[verdict] = "ERROR" )
-Check Failures = CALCULATE ( COUNTROWS ( check_results ), check_results[status] = "FAIL" )
-Check Fail Rate = DIVIDE ( [Check Failures], COUNTROWS ( check_results ) )
-Avg Net Sharpe = AVERAGE ( runs[net_sharpe] )
-Sharpe Lost To Costs = AVERAGE ( runs[gross_sharpe] ) - AVERAGE ( runs[net_sharpe] )
-Pass Rate 30d =
-    CALCULATE ( [Pass Rate], DATESINPERIOD ( 'Date'[Date], MAX ( 'Date'[Date] ), -30, DAY ) )
-```
+## 2. Model
 
-Add a date table (`Date = CALENDARAUTO()`, marked as a date table) related to `runs[audit_date]`
-(Power Query: `Date.From([audited_utc])`).
+- Relationships: `runs[run_id]` 1 → * `findings[run_id]`, and `runs[run_id]` 1 → 1 `run_metrics[run_id]`.
+  `check_daily` is already aggregated, so it relates to the date table only.
+- Date table: the last lines of `measures.dax`. Mark it as a date table and relate `'Date'[Date]` to each
+  table's `audit_date`.
+- Measures: everything else in `measures.dax`.
+- Theme: *View > Themes > Browse for themes*, choose `theme.json`.
+- Format `runs[report_uri]` and `findings[report_uri]` as *Web URL* (*Column tools > Data category*) so each
+  row links to its HTML report.
 
-## Page layout
+## 3. Pages
 
-1. **Overview:** cards for Runs, Pass Rate, Fail Rate and Error Runs; a stacked column of runs by
-   `audit_date` and `verdict` (PASS green, CONDITIONAL amber, FAIL red, ERROR grey); a slicer on `client`.
-2. **Top failing rules:** a bar chart of Check Failures by `check_key`, sorted descending, and a matrix
+1. **Overview:** cards for Runs, Pass Rate, Fail Rate and Error Runs. A stacked column chart of Runs by
+   `audit_date` and `verdict`. A slicer on `client`. A card for *Pass Rate Change vs Prior 30d*.
+2. **Top failing checks:** a bar chart of Failures by `findings[check_key]`, sorted descending, and a matrix
    of `check_key` × `status`.
-3. **Findings:** a table from `v_findings` (client, batch, check, status, explanation, suggested_action)
-   with `report_uri` as a *Web URL* column so each row links to its HTML report.
-4. **Trends:** a line of Check Fail Rate by week per `check_key`, which shows whether clients are fixing
-   look-ahead problems over time.
+3. **Findings:** a table of `findings` (client, batch, check, status, explanation, suggested_action,
+   report_uri). Use *Verdict Colour* as the background of the verdict column.
+4. **Run metrics:** a scatter of `run_metrics[sharpe_delay_1]` (x) against `sharpe_delay_2` (y). Leaky
+   strategies sit far below the diagonal, which makes the look-ahead check easy to explain to a client. Add
+   a table of break-even cost, maximum gross leverage and the share of P&L from the top 5 names.
+5. **Trends:** a line of Check Fail Rate by week for each `check_daily[check_key]`, which shows whether clients
+   are fixing look-ahead problems over time.
+
+## 4. Publish and refresh
+
+Publish to a workspace (*Home > Publish*). With Azure SQL, set the dataset's credentials to *OAuth2* in the
+service, then schedule a refresh (daily is plenty). The CSV route is for building on your PC only, because
+the service can't refresh files on your PC without a gateway.
 
 ## Copilot in Power BI (needs F2 capacity, not trial)
 
-Publish to the Fabric workspace, then try: *"Create a page showing which checks fail most often
-and how that changed this month"* and *"Summarize the findings for client demo."* Then compare
-the generated measures with yours.
+Publish to the Fabric workspace, then try: *"Create a page showing which checks fail most often and how that
+changed this month"* and *"Summarize the findings for client demo."* Compare the measures it generates with
+the ones in `measures.dax`.

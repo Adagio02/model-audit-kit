@@ -77,16 +77,20 @@ def _pipeline(args) -> int:
 
 
 def _export(args) -> int:
+    from modelaudit.cloud.sinks import SqliteSink
+
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    SqliteSink(args.db)  # makes sure the views exist (older results files have only the tables)
     with sqlite3.connect(args.db) as conn:
-        for table in ("runs", "check_results", "explanations"):
+        for table in ("runs", "check_results", "explanations", "v_runs", "v_findings", "v_check_daily",
+                      "v_run_metrics"):
             cur = conn.execute(f"SELECT * FROM {table}")
             with open(out / f"{table}.csv", "w", newline="", encoding="utf-8") as handle:
                 writer = csv.writer(handle)
                 writer.writerow([d[0] for d in cur.description])
                 writer.writerows(cur)
-    print(f"Wrote runs.csv, check_results.csv, explanations.csv to {out}")
+    print(f"Wrote the 3 tables and 4 views (v_runs, v_findings, v_check_daily, v_run_metrics) as CSV to {out}")
     return 0
 
 

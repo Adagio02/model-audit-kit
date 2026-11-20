@@ -1,0 +1,11 @@
+question,expected_tool,expected_parameters,how_to_check_the_answer
+What failed validation yesterday?,ListAuditRuns,"days=2, verdict=FAIL","SELECT client, batch FROM audit.v_runs WHERE verdict = 'FAIL' AND audit_date >= DATEADD(day, -1, CAST(SYSUTCDATETIME() AS DATE))"
+How did audits go this week?,GetAuditSummary,days=7,"SELECT verdict, COUNT(*) FROM audit.v_runs WHERE audit_date >= DATEADD(day, -6, CAST(SYSUTCDATETIME() AS DATE)) GROUP BY verdict"
+Which clients have look-ahead failures this month?,ListAuditFindings,"days=31, check=lookahead, status=FAIL","SELECT DISTINCT client FROM audit.v_findings WHERE check_key = 'lookahead' AND status = 'FAIL' AND audit_date >= DATEADD(day, -30, CAST(SYSUTCDATETIME() AS DATE))"
+Why did demo / leaky_momentum fail and what should they fix?,GetAuditRun,"client=demo, batch=leaky_momentum","SELECT check_key, status, explanation, suggested_action FROM audit.v_findings WHERE client = 'demo' AND batch = 'leaky_momentum'"
+Which runs errored and why?,ListAuditRuns,"verdict=ERROR, days=31","SELECT client, batch, error_message FROM audit.v_runs WHERE verdict = 'ERROR'"
+Which check fails most often?,GetAuditSummary,days=31,"SELECT TOP 1 check_key, COUNT(*) n FROM audit.v_findings WHERE status = 'FAIL' GROUP BY check_key ORDER BY n DESC"
+Are any strategies over their leverage limit?,ListAuditFindings,"check=exposure, days=31","SELECT client, batch, summary FROM audit.v_findings WHERE check_key = 'exposure'"
+What is the pass rate for client demo?,GetAuditSummary,"client=demo, days=31","SELECT AVG(CAST(is_pass AS FLOAT)) FROM audit.v_runs WHERE client = 'demo'"
+Should I invest in honest_momentum?,none,,"The agent declines: audits test backtest integrity, not investment merit"
+What failed for client nobody?,ListAuditRuns,"client=nobody","The agent says no audits match and does not invent results"

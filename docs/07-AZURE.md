@@ -43,6 +43,7 @@ something that works on its own and can be demonstrated.
 | Submit a batch | `.\azure\scripts\submit_batch.ps1 -StorageAccount <name> -Client demo -Batch leaky_momentum -Prices demo\data\prices.csv -Positions demo\data\positions_leaky_momentum.csv -Gates demo\gates.json -Wait` | Blob Storage, Event Grid, serverless triggers |
 | Watch it run | Portal > Function App > *Monitor*, or Application Insights > *Logs*: `traces \| where message startswith "AUDIT_"` | Application Insights, KQL |
 | Query results | Portal > SQL database > *Query editor*: `SELECT * FROM audit.v_findings` | Azure SQL, Entra-only auth |
+| Call the agent API | `Invoke-RestMethod "https://<host>/api/summary?days=7" -Headers @{"x-functions-key"="<key>"}` (deploy.ps1 prints the address) | HTTP-triggered Functions, function keys |
 | Break it on purpose | Upload a positions.csv with a wrong column name | The run is stored as `ERROR` and the alert email arrives within about 15 minutes |
 | See the secret flow | Portal > Function App > *Environment variables* > `AZURE_OPENAI_API_KEY` shows a green "Key vault Reference" tick | Key Vault references, managed identity |
 
@@ -58,8 +59,9 @@ lifecycle rule, which matches `templates/CLIENT-DATA-SPEC.md`.
 - **Fabric (recommended)** or **Azure Data Factory**: follow `azure/fabric/README.md`. Fabric
   uses `azure/fabric/audit_notebook.py`, which calls the same pipeline with a `MemorySink` and Delta
   tables. ADF calls the `RunAudit` HTTP function.
-- **Power BI**: follow `azure/powerbi/README.md` (pass/fail rates, top failing checks, trends).
-  You can build it first from the local CSVs, then repoint it at Azure SQL.
+- **Power BI**: follow `azure/powerbi/README.md` (pass/fail rates, top failing checks, run metrics, trends).
+  The queries (`queries.pq`), measures (`measures.dax`) and theme (`theme.json`) are in that folder. Build it
+  first from the local CSVs, then switch the queries to Azure SQL: the tables and columns are the same.
 
 ## Phase 3: Copilot and AI (week 5-6)
 
@@ -68,7 +70,7 @@ lifecycle rule, which matches `templates/CLIENT-DATA-SPEC.md`.
 | GitHub Copilot | VS Code, this repo | Move `azure/copilot-instructions.md` to `.github/copilot-instructions.md` (GitHub Copilot reads it automatically) so it knows the project rules. Ask it to *"add a check that flags strategies whose gross exposure exceeds 2x"* and review its change against the rules |
 | Microsoft Foundry | Deployed by Bicep | 1) The Function explains every WARN/FAIL in plain English (`cloud/explain.py`), and you can see the text in `explanations.json` and `audit.v_findings`. 2) Gate suggestions: `modelaudit suggest-gates --prices ... --positions ... --openai-endpoint https://<res>.openai.azure.com` |
 | Copilot in Fabric | Pipelines, Dataflows, Power BI (needs paid F2) | Prompts in `azure/fabric/README.md` and `azure/powerbi/README.md` |
-| Copilot Studio | copilotstudio.microsoft.com (30-day trial) | The "Audit Desk" agent in `azure/copilot-studio/README.md` answers *"what failed validation yesterday?"* |
+| Copilot Studio | copilotstudio.microsoft.com (30-day trial) | The "Audit Desk" agent in `azure/copilot-studio/README.md` answers *"what failed validation yesterday?"*. It calls the Function App's read-only Audit Desk API (`/api/summary`, `/api/runs`, `/api/findings`, `/api/runs/{client}/{batch}`), described by `azure/copilot-studio/openapi.yaml`, and is tested against the 10 questions in `azure/copilot-studio/evaluation.csv` |
 
 How the AI is kept safe here: the model sees only the audit's summary numbers, never the client's
 files. Its output must explain exactly the flagged checks, or it's replaced by rule-based text. An

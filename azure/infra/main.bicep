@@ -428,6 +428,7 @@ resource budget 'Microsoft.Consumption/budgets@2023-11-01' = if (!empty(alertEma
 // ---------------- Outputs (used by deploy.ps1) ----------------
 
 output functionAppName string = func.name
+output functionAppHost string = func.properties.defaultHostName
 output storageAccountName string = storage.name
 output storageAccountId string = storage.id
 output sqlServerFqdn string = sql.properties.fullyQualifiedDomainName

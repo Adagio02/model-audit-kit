@@ -1,0 +1,42 @@
+// Measures for the audit dashboard. Create a table called _Measures (Enter data, one empty column),
+// then add each measure to it (Modeling > New measure). Table names match queries.pq.
+
+Runs = COUNTROWS ( runs )
+Passed Runs = CALCULATE ( [Runs], runs[verdict] = "PASS" )
+Pass Rate = DIVIDE ( [Passed Runs], [Runs] )
+Fail Rate = DIVIDE ( CALCULATE ( [Runs], runs[verdict] = "FAIL" ), [Runs] )
+Conditional Rate = DIVIDE ( CALCULATE ( [Runs], runs[verdict] = "CONDITIONAL" ), [Runs] )
+Error Runs = CALCULATE ( [Runs], runs[verdict] = "ERROR" )
+
+Findings = COUNTROWS ( findings )
+Failures = CALCULATE ( [Findings], findings[status] = "FAIL" )
+Warnings = CALCULATE ( [Findings], findings[status] = "WARN" )
+Check Fail Rate = DIVIDE ( SUM ( check_daily[n_fail] ), SUM ( check_daily[n_runs] ) )
+
+Avg Net Sharpe = AVERAGE ( runs[net_sharpe] )
+Sharpe Lost To Costs = AVERAGE ( runs[gross_sharpe] ) - AVERAGE ( runs[net_sharpe] )
+Sharpe Lost To One Day Delay =
+    AVERAGE ( run_metrics[sharpe_delay_1] ) - AVERAGE ( run_metrics[sharpe_delay_2] )
+Median Break-even Cost (bps) = MEDIAN ( run_metrics[breakeven_cost_bps] )
+Exposure Findings =
+    CALCULATE ( [Findings], findings[check_key] = "exposure", findings[status] IN { "WARN", "FAIL" } )
+
+Pass Rate 30d =
+    CALCULATE ( [Pass Rate], DATESINPERIOD ( 'Date'[Date], MAX ( 'Date'[Date] ), -30, DAY ) )
+Pass Rate Change vs Prior 30d =
+    [Pass Rate 30d]
+        - CALCULATE ( [Pass Rate], DATESINPERIOD ( 'Date'[Date], MAX ( 'Date'[Date] ) - 30, -30, DAY ) )
+
+// Colour a verdict column (Format > Cell elements > Background color > Field value)
+Verdict Colour =
+    SWITCH (
+        SELECTEDVALUE ( runs[verdict] ),
+        "PASS", "#1e7b4f",
+        "CONDITIONAL", "#a86a00",
+        "FAIL", "#b23b3b",
+        "ERROR", "#7a8794"
+    )
+
+// Date table: Modeling > New table, then Mark as date table and relate 'Date'[Date] to runs[audit_date],
+// findings[audit_date], check_daily[audit_date] and run_metrics[audit_date].
+// Date = CALENDAR ( MIN ( runs[audit_date] ), MAX ( TODAY (), MAX ( runs[audit_date] ) ) )

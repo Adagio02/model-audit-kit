@@ -1,0 +1,238 @@
+swagger: "2.0"
+info:
+  title: Audit Desk API
+  description: >-
+    Read-only access to independent backtest audit results (Model Audit Kit). Each run audits one
+    batch (a client's strategy) with eight checks and gives a verdict: PASS, CONDITIONAL (warnings only),
+    FAIL, or ERROR (the input could not be audited). A finding is a check with status WARN or FAIL,
+    with a plain-English explanation and a suggested action.
+  version: "1.0"
+# deploy.ps1 writes openapi.generated.yaml with your Function App's host name filled in.
+host: "{{FUNCTION_HOST}}"
+basePath: /api
+schemes:
+  - https
+produces:
+  - application/json
+securityDefinitions:
+  functionKey:
+    type: apiKey
+    in: header
+    name: x-functions-key
+security:
+  - functionKey: []
+paths:
+  /summary:
+    get:
+      operationId: GetAuditSummary
+      summary: Audit summary for a period
+      description: >-
+        Use for overview questions such as "how did audits go this week", "what is the pass rate",
+        or "which checks fail most often". Returns run counts by verdict, the pass rate and the most
+        common findings.
+      parameters:
+        - $ref: "#/parameters/days"
+        - $ref: "#/parameters/client"
+      responses:
+        "200":
+          description: Summary
+          schema:
+            $ref: "#/definitions/Summary"
+        "400":
+          $ref: "#/responses/BadRequest"
+  /runs:
+    get:
+      operationId: ListAuditRuns
+      summary: List audit runs
+      description: >-
+        Use for questions about which batches were audited and their verdicts, for example "what
+        failed validation yesterday" (days=1, verdict=FAIL) or "show all runs for client acme".
+      parameters:
+        - $ref: "#/parameters/days"
+        - $ref: "#/parameters/client"
+        - name: verdict
+          in: query
+          required: false
+          type: string
+          enum: [PASS, CONDITIONAL, FAIL, ERROR]
+          description: Only runs with this verdict.
+        - $ref: "#/parameters/limit"
+      responses:
+        "200":
+          description: Runs, newest first
+          schema:
+            type: object
+            properties:
+              runs:
+                type: array
+                items:
+                  $ref: "#/definitions/Run"
+        "400":
+          $ref: "#/responses/BadRequest"
+  /findings:
+    get:
+      operationId: ListAuditFindings
+      summary: List failed or flagged checks
+      description: >-
+        Use for "why" questions and for questions about a type of problem, for example "which
+        clients have look-ahead failures this month" (check=lookahead, days=31). Each finding
+        includes the explanation and the suggested action.
+      parameters:
+        - $ref: "#/parameters/days"
+        - $ref: "#/parameters/client"
+        - name: check
+          in: query
+          required: false
+          type: string
+          enum: [data_integrity, lookahead, costs, walk_forward, deflated_sharpe, risk, exposure, benchmark]
+          description: >-
+            Only this check. lookahead = look-ahead or leakage; costs = transaction costs;
+            walk_forward = stability over time; deflated_sharpe = overfitting; risk = drawdown;
+            exposure = leverage, position size and concentration; benchmark = value over a benchmark.
+        - name: status
+          in: query
+          required: false
+          type: string
+          enum: [WARN, FAIL]
+          description: Only warnings or only failures.
+        - $ref: "#/parameters/limit"
+      responses:
+        "200":
+          description: Findings, newest first
+          schema:
+            type: object
+            properties:
+              findings:
+                type: array
+                items:
+                  $ref: "#/definitions/Finding"
+        "400":
+          $ref: "#/responses/BadRequest"
+  /runs/{client}/{batch}:
+    get:
+      operationId: GetAuditRun
+      summary: One audit run with all its findings
+      description: >-
+        Use when the user names a specific client and batch, for example "why did demo /
+        leaky_momentum fail".
+      parameters:
+        - name: client
+          in: path
+          required: true
+          type: string
+          description: Client name, for example demo.
+        - name: batch
+          in: path
+          required: true
+          type: string
+          description: Batch name, for example leaky_momentum.
+      responses:
+        "200":
+          description: The run
+          schema:
+            $ref: "#/definitions/RunDetail"
+        "404":
+          description: No audit for this client and batch
+          schema:
+            $ref: "#/definitions/Error"
+        "400":
+          $ref: "#/responses/BadRequest"
+parameters:
+  days:
+    name: days
+    in: query
+    required: false
+    type: integer
+    default: 7
+    minimum: 1
+    maximum: 366
+    description: Look back this many days, including today. Yesterday and today = 2; this week = 7.
+  client:
+    name: client
+    in: query
+    required: false
+    type: string
+    description: Only this client.
+  limit:
+    name: limit
+    in: query
+    required: false
+    type: integer
+    default: 50
+    minimum: 1
+    maximum: 200
+    description: Maximum number of rows.
+responses:
+  BadRequest:
+    description: A parameter is invalid; the error says which.
+    schema:
+      $ref: "#/definitions/Error"
+definitions:
+  Error:
+    type: object
+    properties:
+      error:
+        type: string
+  Run:
+    type: object
+    properties:
+      client: {type: string}
+      batch: {type: string}
+      strategy: {type: string}
+      verdict: {type: string, description: "PASS, CONDITIONAL, FAIL or ERROR"}
+      audit_date: {type: string, description: "Date of the audit (UTC), YYYY-MM-DD"}
+      gross_sharpe: {type: number}
+      net_sharpe: {type: number, description: "Annualized Sharpe ratio after trading costs"}
+      net_total_return: {type: number, description: "Fraction, 0.12 = 12%"}
+      max_drawdown: {type: number, description: "Fraction, -0.25 = -25%"}
+      n_fail: {type: integer}
+      n_warn: {type: integer}
+      report_uri: {type: string, description: "Link to the full HTML report"}
+      error_message: {type: string, description: "Why the input could not be audited (ERROR runs)"}
+  Finding:
+    type: object
+    properties:
+      client: {type: string}
+      batch: {type: string}
+      strategy: {type: string}
+      verdict: {type: string}
+      audit_date: {type: string}
+      check_key: {type: string}
+      title: {type: string}
+      status: {type: string, description: "WARN or FAIL"}
+      summary: {type: string, description: "The check's own numbers"}
+      explanation: {type: string, description: "Plain-English explanation"}
+      suggested_action: {type: string}
+      report_uri: {type: string}
+  RunDetail:
+    allOf:
+      - $ref: "#/definitions/Run"
+      - type: object
+        properties:
+          findings:
+            type: array
+            items:
+              $ref: "#/definitions/Finding"
+  Summary:
+    type: object
+    properties:
+      since: {type: string}
+      days: {type: integer}
+      client: {type: string}
+      runs: {type: integer}
+      pass_rate: {type: number, description: "Fraction of runs with verdict PASS"}
+      by_verdict:
+        type: object
+        properties:
+          PASS: {type: integer}
+          CONDITIONAL: {type: integer}
+          FAIL: {type: integer}
+          ERROR: {type: integer}
+      top_findings:
+        type: array
+        items:
+          type: object
+          properties:
+            check_key: {type: string}
+            status: {type: string}
+            findings: {type: integer}

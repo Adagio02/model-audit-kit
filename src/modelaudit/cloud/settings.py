@@ -37,3 +37,11 @@ def azure_components():
     explainer = make_explainer(_env("AZURE_OPENAI_ENDPOINT", False), _env("AZURE_OPENAI_DEPLOYMENT", False),
                                _env("AZURE_OPENAI_API_KEY", False))
     return store, sink, explainer
+
+
+def azure_reader():
+    """Read-only access to the audit views, for the agent API. Same identity and settings as the sink."""
+    from modelaudit.cloud.reader import AzureSqlReader
+
+    return AzureSqlReader(_env("AUDIT_SQL_SERVER"), _env("AUDIT_SQL_DATABASE"),
+                          _env("AUDIT_SQL_AUTH", False) or "ActiveDirectoryMSI")

@@ -12,3 +12,4 @@ powerbi-data/
 azure/function_app/modelaudit/
 azure/function_app/local.settings.json
 azure/function_app/.python_packages/
+azure/copilot-studio/openapi.generated.yaml

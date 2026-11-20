@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 dependencies = ["pandas>=2.0", "numpy>=1.24", "scipy>=1.10", "matplotlib>=3.7"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = ["pytest>=8", "ruff>=0.5", "pyyaml>=6"]
 # Azure mode: Blob Storage, Azure SQL (mssql-python), Microsoft Foundry / Azure OpenAI
 azure = ["azure-identity>=1.17", "azure-storage-blob>=12.20", "mssql-python>=1.0", "openai>=1.60"]
 
@@ -28,3 +28,7 @@ addopts = "-q --basetemp=pytest-temp"
 
 [tool.ruff]
 line-length = 110
+
+[tool.ruff.lint.per-file-ignores]
+# Fabric notebook cells: imports sit in the cell that first needs them, by design.
+"azure/fabric/audit_notebook.py" = ["E402"]

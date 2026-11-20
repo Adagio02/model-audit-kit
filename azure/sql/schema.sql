@@ -65,7 +65,7 @@ GO
 
 -- Every WARN/FAIL with its explanation: "what failed and why".
 CREATE OR ALTER VIEW audit.v_findings AS
-SELECT r.client, r.batch, r.strategy, r.verdict, CAST(r.audited_utc AS DATE) AS audit_date,
+SELECT r.run_id, r.client, r.batch, r.strategy, r.verdict, CAST(r.audited_utc AS DATE) AS audit_date,
        c.check_key, c.title, c.status, c.summary,
        e.explanation, e.suggested_action, e.model, r.report_uri
 FROM audit.check_results c
@@ -84,4 +84,25 @@ SELECT CAST(r.audited_utc AS DATE) AS audit_date, c.check_key, c.title,
 FROM audit.check_results c
 JOIN audit.runs r ON r.run_id = c.run_id
 GROUP BY CAST(r.audited_utc AS DATE), c.check_key, c.title;
+GO
+
+-- One row per run with the key number from each check: the "Run metrics" page in Power BI.
+CREATE OR ALTER VIEW audit.v_run_metrics AS
+SELECT r.run_id, r.client, r.batch, r.verdict, CAST(r.audited_utc AS DATE) AS audit_date,
+       MAX(CASE WHEN c.check_key = 'lookahead' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.sharpe_by_delay."1"') AS FLOAT) END) AS sharpe_delay_1,
+       MAX(CASE WHEN c.check_key = 'lookahead' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.sharpe_by_delay."2"') AS FLOAT) END) AS sharpe_delay_2,
+       MAX(CASE WHEN c.check_key = 'costs' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.breakeven_cost_bps') AS FLOAT) END) AS breakeven_cost_bps,
+       MAX(CASE WHEN c.check_key = 'costs' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.annual_turnover') AS FLOAT) END) AS annual_turnover,
+       MAX(CASE WHEN c.check_key = 'walk_forward' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.positive_fraction') AS FLOAT) END) AS positive_window_fraction,
+       MAX(CASE WHEN c.check_key = 'deflated_sharpe' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.probability_real') AS FLOAT) END) AS probability_real,
+       MAX(CASE WHEN c.check_key = 'deflated_sharpe' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.sharpe_ci95_low') AS FLOAT) END) AS sharpe_ci95_low,
+       MAX(CASE WHEN c.check_key = 'deflated_sharpe' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.sharpe_ci95_high') AS FLOAT) END) AS sharpe_ci95_high,
+       MAX(CASE WHEN c.check_key = 'exposure' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.max_gross_leverage') AS FLOAT) END) AS max_gross_leverage,
+       MAX(CASE WHEN c.check_key = 'exposure' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.max_position_weight') AS FLOAT) END) AS max_position_weight,
+       MAX(CASE WHEN c.check_key = 'exposure' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.top5_names_pnl_share') AS FLOAT) END) AS top5_names_pnl_share,
+       MAX(CASE WHEN c.check_key = 'data_integrity' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.missing_fraction') AS FLOAT) END) AS missing_fraction,
+       MAX(CASE WHEN c.check_key = 'benchmark' THEN TRY_CAST(JSON_VALUE(c.metrics_json, '$.information_ratio') AS FLOAT) END) AS information_ratio
+FROM audit.runs r
+JOIN audit.check_results c ON c.run_id = r.run_id
+GROUP BY r.run_id, r.client, r.batch, r.verdict, r.audited_utc;
 GO

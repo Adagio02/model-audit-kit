@@ -89,7 +89,7 @@ def test_pipeline_end_to_end_writes_reports_and_rows(tmp_path, batch_files):
         lookahead = conn.execute("SELECT status FROM check_results WHERE check_key='lookahead'").fetchone()[0]
         n_expl = conn.execute("SELECT COUNT(*) FROM explanations").fetchone()[0]
     assert run[0] == "Leaky L/S" and run[1] == "FAIL" and run[2] >= 1
-    assert n_checks == 7 and lookahead == "FAIL"
+    assert n_checks == 8 and lookahead == "FAIL"
     assert n_expl == len(outcome.explanations) >= 1
 
 
@@ -100,7 +100,7 @@ def test_rerunning_a_batch_replaces_rows_instead_of_duplicating(tmp_path, batch_
         process_batch(LocalStore(tmp_path), sink, RuleExplainer(), "acme", "b1")
     with sqlite3.connect(tmp_path / "results.db") as conn:
         assert conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
-        assert conn.execute("SELECT COUNT(*) FROM check_results").fetchone()[0] == 7
+        assert conn.execute("SELECT COUNT(*) FROM check_results").fetchone()[0] == 8
 
 
 def test_bad_input_is_recorded_as_error_not_raised(tmp_path, batch_files):
@@ -169,6 +169,11 @@ def test_cli_pipeline_and_export(tmp_path, batch_files):
     main(["export", "--db", str(tmp_path / "results.db"), "--out", str(out)])
     runs = pd.read_csv(out / "runs.csv")
     assert runs.loc[0, "run_id"] == run_id_for("acme", "b1")
+    metrics = pd.read_csv(out / "v_run_metrics.csv")
+    assert len(metrics) == 1 and metrics.loc[0, "sharpe_delay_1"] > metrics.loc[0, "sharpe_delay_2"]
+    assert metrics.loc[0, "max_gross_leverage"] == pytest.approx(1.0)
+    findings = pd.read_csv(out / "v_findings.csv")
+    assert "lookahead" in set(findings.check_key) and findings.explanation.notna().all()
 
 
 # ---------- gate suggestions (Foundry) ----------
@@ -260,4 +265,97 @@ def test_memory_sink_for_fabric_is_idempotent(tmp_path, batch_files):
     for _ in range(2):
         process_batch(LocalStore(tmp_path), sink, RuleExplainer(), "acme", "b1")
     tables = sink.tables()
-    assert len(tables["runs"]) == 1 and len(tables["check_results"]) == 7
+    assert len(tables["runs"]) == 1 and len(tables["check_results"]) == 8
+
+
+# ---------- read API for the Copilot Studio agent ----------
+
+def _two_runs(tmp_path, batch_files):
+    """One failing batch (leaky) and one erroring batch, stored in SQLite."""
+    from modelaudit.cloud.reader import SqliteReader
+
+    _stage(tmp_path, batch_files, "acme", "leaky")
+    _stage(tmp_path, batch_files, "zeta", "broken")
+    (tmp_path / INPUTS / "zeta" / "broken" / "positions.csv").write_text("date,symbol,wt\n2020-01-01,A,1\n")
+    sink = SqliteSink(tmp_path / "results.db")
+    for client, batch in (("acme", "leaky"), ("zeta", "broken")):
+        process_batch(LocalStore(tmp_path), sink, RuleExplainer(), client, batch)
+    return SqliteReader(tmp_path / "results.db")
+
+
+def test_reader_answers_agent_questions(tmp_path, batch_files):
+    reader = _two_runs(tmp_path, batch_files)
+    summary = reader.summary(days=7)
+    assert summary["runs"] == 2 and summary["by_verdict"]["FAIL"] == 1 and summary["by_verdict"]["ERROR"] == 1
+    assert summary["pass_rate"] == 0.0
+    assert summary["top_findings"][0]["status"] == "FAIL"
+
+    assert [r["batch"] for r in reader.runs(days=7, verdict="error")] == ["broken"]
+    assert reader.runs(days=7, client="acme")[0]["verdict"] == "FAIL"
+    leaks = reader.findings(days=7, check="lookahead")
+    assert len(leaks) == 1 and leaks[0]["client"] == "acme" and leaks[0]["suggested_action"]
+    assert all(f["status"] == "FAIL" for f in reader.findings(days=7, status="FAIL"))
+
+    detail = reader.run("acme", "leaky")
+    assert detail["verdict"] == "FAIL" and {f["check_key"] for f in detail["findings"]} >= {"lookahead"}
+    assert reader.run("acme", "missing") is None
+
+
+def test_reader_rejects_bad_parameters_and_ignores_old_runs(tmp_path, batch_files):
+    from modelaudit.cloud.reader import QueryError, since_date
+
+    reader = _two_runs(tmp_path, batch_files)
+    for bad in ({"days": 0}, {"days": 400}, {"limit": 1000}, {"verdict": "MAYBE"}):
+        with pytest.raises(QueryError):
+            reader.runs(**bad)
+    with pytest.raises(QueryError):
+        reader.findings(status="PASS")
+    with sqlite3.connect(tmp_path / "results.db") as conn:  # move one run 30 days into the past
+        conn.execute("UPDATE runs SET audited_utc = '2000-01-01T00:00:00+00:00' WHERE batch = 'broken'")
+    assert [r["batch"] for r in reader.runs(days=30)] == ["leaky"]
+    assert since_date(1) == pd.Timestamp.now("UTC").date().isoformat()
+    # Parameters are bound, never pasted into SQL.
+    assert reader.runs(days=7, client="x' OR '1'='1") == []
+
+
+def test_agent_http_endpoints(monkeypatch, tmp_path, batch_files):
+    app = _load_function_app(monkeypatch, tmp_path)
+    app._reader = _two_runs(tmp_path, batch_files)
+    get = lambda fn, params=None, route=None: fn(SimpleNamespace(params=params or {}, route_params=route or {}))  # noqa: E731
+
+    summary = get(app.agent_summary, {"days": "7"})
+    assert summary.status_code == 200 and json.loads(summary.body)["runs"] == 2
+    runs = json.loads(get(app.agent_runs, {"verdict": "FAIL"}).body)["runs"]
+    assert [r["client"] for r in runs] == ["acme"]
+    findings = json.loads(get(app.agent_findings, {"check": "lookahead"}).body)["findings"]
+    assert findings and findings[0]["batch"] == "leaky"
+    detail = get(app.agent_run_detail, route={"client": "acme", "batch": "leaky"})
+    assert detail.status_code == 200 and json.loads(detail.body)["findings"]
+
+    assert get(app.agent_run_detail, route={"client": "acme", "batch": "nope"}).status_code == 404
+    assert get(app.agent_run_detail, route={"client": "../etc", "batch": "x"}).status_code == 400
+    assert get(app.agent_runs, {"days": "abc"}).status_code == 400
+    assert get(app.agent_runs, {"days": "9999"}).status_code == 400
+    assert get(app.agent_findings, {"check": "x;drop"}).status_code == 400
+    assert get(app.agent_runs, {"client": "bad name"}).status_code == 400
+
+
+def test_openapi_spec_matches_the_function_routes_and_checks():
+    yaml = pytest.importorskip("yaml")
+    from pathlib import Path
+
+    from modelaudit.audit import run_audit
+    from modelaudit.config import Gates
+
+    root = Path(__file__).resolve().parents[1]
+    spec = yaml.safe_load((root / "azure" / "copilot-studio" / "openapi.yaml").read_text(encoding="utf-8"))
+    assert spec["swagger"] == "2.0" and spec["securityDefinitions"]["functionKey"]["name"] == "x-functions-key"
+    source = (root / "azure" / "function_app" / "function_app.py").read_text(encoding="utf-8")
+    for path in spec["paths"]:
+        assert f'route="{path.lstrip("/")}"' in source, path
+    check_enum = next(p for p in spec["paths"]["/findings"]["get"]["parameters"] if p.get("name") == "check")["enum"]
+    dates = pd.bdate_range("2020-01-01", periods=60)
+    prices = pd.DataFrame({"date": dates, "ticker": "A", "close": np.linspace(100, 110, 60)})
+    weights = pd.DataFrame({"date": dates, "ticker": "A", "weight": 0.5})
+    keys = [c.key for c in run_audit(prices, weights, Gates(folds=2)).checks]
+    assert sorted(check_enum) == sorted(keys)

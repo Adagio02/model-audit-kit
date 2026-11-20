@@ -3,6 +3,10 @@
 #   az login
 #   powershell -ExecutionPolicy Bypass -File .\azure\scripts\deploy.ps1 -ResourceGroup rg-model-audit -AlertEmail you@example.com
 #
+# Options: -ReaderLogin you@tenant.onmicrosoft.com gives that account read-only access to the reporting
+# views (Power BI, Copilot Studio SQL knowledge). The script ends by printing the Audit Desk API address
+# and writing azure\copilot-studio\openapi.generated.yaml for the Copilot Studio agent.
+#
 # Needs: Azure CLI (az), Azure Functions Core Tools v4 (func), and the project's .venv
 # with the azure extras (scripts\setup.ps1 -Azure). Safe to re-run: every step is idempotent.
 
@@ -14,7 +18,8 @@ param(
     [int]$MonthlyBudget = 10,
     [switch]$SkipFoundry,
     [string]$FoundryLocation = "",
-    [string]$SqlLocation = ""
+    [string]$SqlLocation = "",
+    [string]$ReaderLogin = ""
 )
 $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -53,6 +58,7 @@ $out = az deployment group create -g $ResourceGroup -n model-audit -f azure\infr
     --parameters $params --query properties.outputs -o json | ConvertFrom-Json
 Check "The infrastructure deployment"
 $app = $out.functionAppName.value
+$appHost = $out.functionAppHost.value
 $sql = $out.sqlServerFqdn.value
 $dbName = $out.sqlDatabaseName.value
 $storage = $out.storageAccountName.value
@@ -63,6 +69,10 @@ Step "Creating SQL tables and views, and granting the Function's identity access
 Check "Creating the SQL schema"
 & $Py azure\scripts\apply_sql.py --server $sql --database $dbName --file azure\sql\grant_function_identity.sql --var "APP_NAME=$app"
 Check "Granting SQL access"
+if ($ReaderLogin) {
+    & $Py azure\scripts\apply_sql.py --server $sql --database $dbName --file azure\sql\grant_agent_reader.sql --var "READER_LOGIN=$ReaderLogin"
+    Check "Granting read-only access to $ReaderLogin"
+}
 
 Step "Packaging and publishing the function code (remote build)"
 $pkg = "azure\function_app\modelaudit"
@@ -84,10 +94,17 @@ az deployment group create -g $ResourceGroup -n model-audit-events -f azure\infr
     --parameters functionAppName=$app storageAccountName=$storage topicName=$topic --only-show-errors | Out-Null
 Check "Connecting storage events to the function"
 
+Step "Preparing the Copilot Studio API description"
+$spec = Get-Content azure\copilot-studio\openapi.yaml -Raw
+Set-Content azure\copilot-studio\openapi.generated.yaml -Value $spec.Replace("{{FUNCTION_HOST}}", $appHost) -Encoding UTF8
+Write-Host "Audit Desk API: https://$appHost/api  (spec: azure\copilot-studio\openapi.generated.yaml)"
+Write-Host "Function key:   az functionapp keys list -g $ResourceGroup -n $app --query functionKeys.default -o tsv"
+
 Step "Done"
 Write-Host @"
 Try it with the demo data:
   powershell -ExecutionPolicy Bypass -File .\azure\scripts\submit_batch.ps1 -StorageAccount $storage -Client demo -Batch leaky_momentum ``
       -Prices demo\data\prices.csv -Positions demo\data\positions_leaky_momentum.csv -Gates demo\gates.json
 Then check: Azure portal > $app > Monitor, the audit-reports container, and SQL: SELECT * FROM audit.v_findings
+Agent: follow azure\copilot-studio\README.md. Dashboard: follow azure\powerbi\README.md.
 "@
