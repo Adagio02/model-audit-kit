@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Independent backtest audits</title>
+<meta name="description" content="Independent audits of trading-strategy backtests: look-ahead, costs, stability, overfitting, drawdown and exposure, with a pass/fail verdict against limits agreed in advance.">
+<style>
+:root {
+  --ink: #1d2733; --muted: #5b6776; --rule: #d9dee5; --wash: #f3f6f8;
+  --teal: #1f6f8b; --pass: #1e7b4f; --warn: #a86a00; --fail: #b23b3b; --paper: #ffffff;
+  --serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 var(--sans);
+  font-variant-numeric: tabular-nums; }
+a { color: var(--teal); text-underline-offset: 3px; }
+a:hover { color: var(--ink); }
+:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; border-radius: 2px; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 28px; }
+.read { max-width: 680px; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em; }
+h1 { font-size: clamp(34px, 5.2vw, 56px); line-height: 1.08; margin: 0 0 22px; max-width: 18ch; }
+h2 { font-size: 30px; line-height: 1.2; margin: 0 0 18px; }
+h3 { font-size: 19px; margin: 0 0 4px; }
+p { margin: 0 0 16px; }
+.lede { font-size: 20px; color: var(--muted); max-width: 34em; }
+
+header.site { border-bottom: 1px solid var(--rule); }
+header.site .wrap { display: flex; justify-content: space-between; align-items: baseline; padding-top: 18px; padding-bottom: 16px; }
+.mark { font-family: var(--serif); font-weight: 600; font-size: 19px; color: var(--ink); text-decoration: none; }
+nav a { margin-left: 22px; font-size: 15px; color: var(--muted); text-decoration: none; }
+nav a:hover { color: var(--ink); text-decoration: underline; }
+
+.hero { padding: 72px 0 40px; }
+.figure { margin: 36px 0 0; }
+.delay-chart { width: 100%; height: auto; display: block; overflow: visible; }
+.delay-chart .grid { stroke: var(--rule); stroke-width: 1; }
+.delay-chart .axis { fill: var(--muted); font: 12px var(--sans); }
+.delay-chart .line { fill: none; stroke-width: 2.4; stroke-linejoin: round; }
+.delay-chart .line.tested { stroke: var(--fail); }
+.delay-chart .line.delayed { stroke: var(--teal); stroke-dasharray: 3000; stroke-dashoffset: 0; }
+.delay-chart .dot.tested { fill: var(--fail); } .delay-chart .dot.delayed { fill: var(--teal); }
+.delay-chart .end { font: 600 14px var(--sans); } .delay-chart .end.tested { fill: var(--fail); }
+.delay-chart .end.delayed { fill: var(--teal); }
+.delay-chart .endnum { font: 14px var(--sans); fill: var(--ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .delay-chart .line.delayed { animation: draw 2.4s 0.6s cubic-bezier(.3,.1,.2,1) both; }
+  .delay-chart .dot.delayed, .delay-chart .end.delayed, .delay-chart .endnum:last-of-type { animation: show .4s 2.9s both; }
+  @keyframes draw { from { stroke-dashoffset: 3000; } to { stroke-dashoffset: 0; } }
+  @keyframes show { from { opacity: 0; } to { opacity: 1; } }
+}
+figcaption { font-size: 15px; color: var(--muted); max-width: 46em; margin-top: 14px; }
+.links { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 12px 26px; font-size: 16px; }
+.button { display: inline-block; background: var(--ink); color: #fff; text-decoration: none; padding: 11px 18px;
+  border-radius: 4px; font-weight: 600; }
+.button:hover { background: var(--teal); color: #fff; }
+
+section { padding: 64px 0; border-top: 1px solid var(--rule); }
+.checks { display: grid; grid-template-columns: 15em 1fr; margin: 8px 0 0; max-width: 860px; }
+.checks dt, .checks dd { margin: 0; padding: 13px 0; border-top: 1px solid var(--rule); }
+.checks dt { font-weight: 600; padding-right: 24px; }
+.checks dd { color: var(--muted); }
+.note { font-size: 15px; color: var(--muted); margin-top: 18px; max-width: 46em; }
+
+ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 8px 0 0; max-width: 760px; }
+ol.steps li { counter-increment: s; position: relative; padding: 0 0 22px 52px; }
+ol.steps li::before { content: counter(s); position: absolute; left: 0; top: -1px; width: 32px; height: 32px;
+  border: 1.5px solid var(--ink); border-radius: 50%; text-align: center; font: 600 15px/30px var(--sans); }
+ol.steps li:not(:last-child)::after { content: ""; position: absolute; left: 16px; top: 36px; bottom: 4px; border-left: 1.5px solid var(--rule); }
+ol.steps p { margin: 0; color: var(--muted); }
+
+table.examples { width: 100%; border-collapse: collapse; font-size: 16px; margin-top: 8px; }
+.examples th { text-align: left; font-weight: 600; color: var(--muted); font-size: 14px; padding: 0 12px 10px 0; }
+.examples td { border-top: 1px solid var(--rule); padding: 14px 12px 14px 0; vertical-align: top; }
+.examples td.num { text-align: right; white-space: nowrap; }
+.examples th.num { text-align: right; }
+.verdict { display: inline-block; font-size: 13px; font-weight: 700; color: #fff; padding: 2px 9px; border-radius: 999px; }
+.verdict.pass { background: var(--pass); } .verdict.fail { background: var(--fail); }
+.scroll { overflow-x: auto; }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+ul.plain { padding-left: 1.1em; margin: 0; } ul.plain li { margin-bottom: 10px; }
+
+.contact { background: var(--wash); border-top: 0; }
+.contact .lede { color: var(--ink); }
+footer { padding: 28px 0 48px; font-size: 14px; color: var(--muted); }
+
+@media (max-width: 760px) {
+  body { font-size: 16px; }
+  .hero { padding-top: 44px; }
+  .checks { grid-template-columns: 1fr; }
+  .checks dd { border-top: 0; padding-top: 0; }
+  .two { grid-template-columns: 1fr; gap: 28px; }
+  nav a:not(:last-child) { display: none; }
+  section { padding: 48px 0; }
+  .delay-chart .axis { font-size: 26px; }
+  .delay-chart .end, .delay-chart .endnum { font-size: 27px; }
+  .delay-chart .line { stroke-width: 4; }
+}
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <a class="mark" href="#top">Model Audit Kit</a>
+  <nav aria-label="Sections"><a href="#checks">What is checked</a><a href="#examples">Example audits</a><a href="#contact">Request a free scan</a></nav>
+</div></header>
+
+<main id="top">
+<div class="hero"><div class="wrap">
+  <h1>This backtest made 5,502%. Trade each signal one day later and most of it is gone.</h1>
+  <p class="lede">The strategy was using tomorrow's prices by mistake. Delaying execution is one of eight
+  checks in an independent audit of your backtest, run against limits you agree before it starts.</p>
+  <figure class="figure">
+    {{CHART}}
+    <figcaption>Growth of $1 in a synthetic momentum strategy, 2015 to 2024, after 10 bps of trading costs
+    (log scale). Annualized Sharpe ratio 5.41 as backtested, 1.63 with one day of delay. An honest signal
+    fades gradually; a leak falls off a cliff. Synthetic data, so the right answer is known.</figcaption>
+  </figure>
+  <div class="links">
+    <a class="button" href="reports/leaky_momentum.html">Read the full audit report</a>
+    <a href="reports/leaky_momentum_fixed.html">The same strategy with the bug fixed</a>
+  </div>
+</div></div>
+
+<section id="checks"><div class="wrap">
+  <h2>What the audit checks</h2>
+  <p class="read">Each check gives PASS, WARN or FAIL against gates fixed in advance and printed in the report.
+  Any FAIL makes the verdict FAIL; warnings alone make it CONDITIONAL.</p>
+  <dl class="checks">
+    <dt>Data integrity</dt><dd>Are prices clean and adjusted? Are delisted stocks included, or does the universe only contain survivors?</dd>
+    <dt>Look-ahead and leakage</dt><dd>Does performance collapse when every trade is delayed by a day?</dd>
+    <dt>Transaction costs</dt><dd>Does the edge survive realistic costs, and at what cost per trade does it disappear?</dd>
+    <dt>Stability over time</dt><dd>Is the result positive in most periods, or carried by one good stretch?</dd>
+    <dt>Overfitting</dt><dd>Is the Sharpe ratio still significant once the number of variants you tried is counted?</dd>
+    <dt>Drawdown</dt><dd>Is the worst loss inside your limit?</dd>
+    <dt>Exposure and concentration</dt><dd>Does the book respect your leverage and position limits? Do a few names or days produce the result?</dd>
+    <dt>Benchmark</dt><dd>Does it beat simply holding the benchmark?</dd>
+  </dl>
+  <p class="note">The checks are open source: <a href="https://github.com/Adagio02/model-audit-kit">read the code and its tests on GitHub</a>.</p>
+</div></section>
+
+<section id="how"><div class="wrap">
+  <h2>How an audit works</h2>
+  <ol class="steps">
+    <li><h3>You send two files</h3><p>Daily prices and the positions your strategy held, as CSV. No code, and no explanation of your signal.</p></li>
+    <li><h3>We agree the gates</h3><p>Your cost per trade, the number of variants you tried, and your drawdown, leverage and position limits. They are fixed before any result is seen.</p></li>
+    <li><h3>The audit runs</h3><p>All eight checks, with every input file fingerprinted so the result can be reproduced exactly.</p></li>
+    <li><h3>You get the verdict and the fixes</h3><p>A report you can share with investors, a written memo of what to fix first, and a review call.</p></li>
+    <li><h3>Re-test</h3><p>After your fixes, the audit runs again on the same gates.</p></li>
+  </ol>
+</div></section>
+
+<section id="examples"><div class="wrap">
+  <h2>Four example audits</h2>
+  <p class="read">Four strategies on the same synthetic market of 80 stocks. Open any report to see exactly what a client receives.</p>
+  <div class="scroll"><table class="examples">
+    <thead><tr><th scope="col">Strategy</th><th scope="col">Verdict</th><th scope="col">Why</th><th scope="col" class="num">Net Sharpe</th></tr></thead>
+    <tbody>
+      <tr><td><a href="reports/honest_momentum.html">Honest momentum</a></td><td><span class="verdict pass">PASS</span></td><td>Fades gradually with delay and survives costs.</td><td class="num">{{S_honest_momentum}}</td></tr>
+      <tr><td><a href="reports/leaky_momentum.html">Leaky momentum</a></td><td><span class="verdict fail">FAIL</span></td><td>Uses tomorrow's return by mistake.</td><td class="num">{{S_leaky_momentum}}</td></tr>
+      <tr><td><a href="reports/leaky_momentum_fixed.html">Leaky momentum, fixed</a></td><td><span class="verdict pass">PASS</span></td><td>Same strategy after a one-line fix: the real, smaller edge.</td><td class="num">{{S_leaky_momentum_fixed}}</td></tr>
+      <tr><td><a href="reports/high_turnover_reversal.html">High-turnover reversal</a></td><td><span class="verdict fail">FAIL</span></td><td>A real but tiny edge that costs erase; 5.4x leverage.</td><td class="num">{{S_high_turnover_reversal}}</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="data"><div class="wrap two">
+  <div>
+    <h2>Your data</h2>
+    <ul class="plain">
+      <li>Used only for your audit, and deleted 30 days after delivery unless you ask otherwise.</li>
+      <li>When an AI model drafts the plain-English explanations, it sees only the audit's summary numbers, never your files, and every explanation is reviewed before it reaches you.</li>
+      <li>If you prefer, the whole pipeline can run in your own Azure subscription, so your data never leaves it.</li>
+    </ul>
+  </div>
+  <div>
+    <h2>What it is not</h2>
+    <p>The audit tests how a backtest was built, under the stated assumptions. It is not investment advice,
+    not a recommendation to buy or sell anything, and not a forecast. A PASS means no disqualifying problem
+    was found by these tests, not that the strategy will make money.</p>
+  </div>
+</div></section>
+
+<section id="contact" class="contact"><div class="wrap">
+  <h2>Request a free scan</h2>
+  <p class="lede read">Send prices and positions for one strategy and get the full report back within three business days.</p>
+  <p><a class="button" href="mailto:{{EMAIL}}?subject=Free%20backtest%20scan">Email {{NAME}}</a></p>
+  <p class="note">{{EMAIL}}{{LINKEDIN_LINE}}. The <a href="https://github.com/Adagio02/model-audit-kit/blob/main/templates/CLIENT-DATA-SPEC.md">data specification</a> lists exactly what to send.</p>
+</div></section>
+</main>
+
+<footer><div class="wrap">Not investment advice. Example audits use synthetic data. The code behind every check is public on
+<a href="https://github.com/Adagio02/model-audit-kit">GitHub</a>.</div></footer>
+</body>
+</html>

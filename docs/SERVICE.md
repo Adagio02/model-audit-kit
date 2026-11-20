@@ -56,4 +56,4 @@ disqualifying problem was found by these tests; it does not mean the strategy wi
 
 ## Contact
 
-{Your name} · {email} · {website}. A free first scan of one strategy is available on request.
+{Your name} · {email} · [adagio02.github.io/model-audit-kit](https://adagio02.github.io/model-audit-kit/). A free first scan of one strategy is available on request.

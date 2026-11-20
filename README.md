@@ -1,5 +1,7 @@
 # Model Audit Kit
 
+**Website and example reports:** https://adagio02.github.io/model-audit-kit/
+
 Independent validation of trading-strategy backtests. A client sends two CSV files
 (prices and their daily positions); the tool runs eight checks against gates fixed in
 advance and produces a one-page HTML report with a **PASS / CONDITIONAL / FAIL** verdict.
@@ -64,6 +66,7 @@ The data is synthetic on purpose: nobody's real strategy is exposed, and the "ri
     demo/             synthetic market, gates and sample reports
     templates/        default gates, client data spec
     docs/             the service (SERVICE.md) and the Azure guide (07-AZURE.md)
+    site/             the public website (build.py, template.html), published by .github/workflows/pages.yml
     clients/          per-client work (git-ignored, never commit client data)
 
 ## The service
