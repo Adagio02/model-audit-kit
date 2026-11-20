@@ -24,6 +24,7 @@ Two CSV files, one row per date and ticker. Daily data is the default; tell us i
 **Also tell us** (goes into `gates.json`):
 - your realistic cost per trade in basis points (commission + spread + impact);
 - how many strategy variants or parameter sets you tried before this one (honest number);
-- your drawdown limit and benchmark.
+- your drawdown limit and benchmark;
+- your leverage and position-size limits (gross exposure, largest single position), if any.
 
 You do not need to send code or explain the signal. Files are deleted 30 days after delivery unless you ask otherwise.
