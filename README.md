@@ -63,7 +63,13 @@ The data is synthetic on purpose: nobody's real strategy is exposed, and the "ri
                       Power BI queries/measures/theme, Copilot Studio API spec, instructions and test set
     demo/             synthetic market, gates and sample reports
     templates/        default gates, client data spec
-    docs/             guides
+    docs/             the service (SERVICE.md) and the Azure guide (07-AZURE.md)
     clients/          per-client work (git-ignored, never commit client data)
+
+## The service
+
+The kit is used to deliver independent backtest audits for systematic managers and allocators:
+what is checked, what you send, what you get and how data is handled are in
+[docs/SERVICE.md](docs/SERVICE.md). Running it on Azure: [docs/07-AZURE.md](docs/07-AZURE.md).
 
 Not investment advice. The audit tests the integrity of a backtest; it does not predict returns.

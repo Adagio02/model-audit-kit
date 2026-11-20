@@ -13,3 +13,5 @@ azure/function_app/modelaudit/
 azure/function_app/local.settings.json
 azure/function_app/.python_packages/
 azure/copilot-studio/openapi.generated.yaml
+# Private business documents (pricing, outreach, SOW, legal, résumé): never commit
+business-private/
