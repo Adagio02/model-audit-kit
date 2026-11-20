@@ -1,4 +1,4 @@
-"""Shows audit results from Azure SQL in the terminal (signs in with your az login).
+r"""Shows audit results from Azure SQL in the terminal (signs in with your az login).
 
     .\.venv\Scripts\python.exe azure\scripts\show_results.py            # every run
     .\.venv\Scripts\python.exe azure\scripts\show_results.py findings   # every WARN/FAIL with its explanation
