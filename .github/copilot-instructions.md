@@ -1,6 +1,6 @@
 # Instructions for GitHub Copilot in this repository
 
-Model Audit Kit audits trading-strategy backtests: two CSVs in, seven checks, a PASS / CONDITIONAL /
+Model Audit Kit audits trading-strategy backtests: two CSVs in, eight checks, a PASS / CONDITIONAL /
 FAIL verdict and an HTML report out. It runs locally (CLI) and in Azure (Function + Blob + SQL + Foundry).
 
 ## Layout

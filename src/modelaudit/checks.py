@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -149,6 +150,76 @@ def walk_forward(net: pd.Series, gates: Gates) -> CheckResult:
                        {"folds": folds})
 
 
+def sharpe_interval(net: pd.Series, periods: int, block: int, draws: int = 1000,
+                    seed: int = 0) -> tuple[float, float]:
+    """95% moving-block bootstrap interval for the annualized Sharpe ratio. Blocks keep the
+    serial correlation of daily returns; the fixed seed makes reports reproducible."""
+    x = net.dropna().to_numpy()
+    n = len(x)
+    if n < 2 * block or block < 1:
+        return float("nan"), float("nan")
+    rng = np.random.default_rng(seed)
+    starts = rng.integers(0, n - block + 1, size=(draws, int(np.ceil(n / block))))
+    idx = (starts[:, :, None] + np.arange(block)).reshape(draws, -1)[:, :n]
+    sample = x[idx]
+    sd = sample.std(axis=1, ddof=1)
+    ratios = np.where(sd > 0, sample.mean(axis=1) / np.where(sd > 0, sd, 1) * np.sqrt(periods), 0.0)
+    low, high = np.percentile(ratios, [2.5, 97.5])
+    return float(low), float(high)
+
+
+def exposure(weights: pd.DataFrame, returns: pd.DataFrame, net: pd.Series, gates: Gates) -> CheckResult:
+    """Does the book stay inside the mandate, and is the result spread across names and days
+    rather than carried by a handful of them?"""
+    aligned = weights.reindex(index=returns.index, columns=returns.columns).ffill().fillna(0.0)
+    gross = aligned.abs().sum(axis=1)
+    net_exposure = aligned.sum(axis=1)
+    active = gross > 0
+    max_gross = float(gross.max()) if len(gross) else 0.0
+    max_weight = float(aligned.abs().max().max()) if aligned.size else 0.0
+    shares = aligned.abs().div(gross.where(active), axis=0)
+    effective_names = float((1 / (shares ** 2).sum(axis=1)[active]).median()) if active.any() else 0.0
+
+    pnl_by_name = (aligned.shift(1) * returns).iloc[1:].sum()
+    total_pnl = float(pnl_by_name.sum())
+    top5_share = float(pnl_by_name.nlargest(5).sum() / total_pnl) if total_pnl > 0 else None
+
+    log_net = np.log1p(net.dropna().clip(lower=-0.999))
+    n_best = max(int(np.ceil(0.01 * len(log_net))), 1)
+    total_log = float(log_net.sum())
+    without_best = total_log - float(log_net.nlargest(n_best).sum())
+
+    fails, warns = [], []
+    if max_gross > 1.5 * gates.max_gross_leverage:
+        fails.append(f"gross leverage reaches {max_gross:.1f}x (limit {gates.max_gross_leverage:g}x)")
+    elif max_gross > gates.max_gross_leverage:
+        warns.append(f"gross leverage reaches {max_gross:.1f}x (limit {gates.max_gross_leverage:g}x)")
+    if max_weight > 1.5 * gates.max_position_weight:
+        fails.append(f"a single position reaches {max_weight:.0%} (limit {gates.max_position_weight:.0%})")
+    elif max_weight > gates.max_position_weight:
+        warns.append(f"a single position reaches {max_weight:.0%} (limit {gates.max_position_weight:.0%})")
+    if top5_share is not None and top5_share > gates.max_top5_pnl_share:
+        warns.append(f"{top5_share:.0%} of gross P&L comes from 5 names")
+    if total_log > 0 and without_best < 0:
+        warns.append(f"the net result turns negative without the best {n_best} days")
+
+    status = FAIL if fails else (WARN if warns else PASS)
+    text = "; ".join(fails + warns) or (
+        f"Gross leverage up to {max_gross:.1f}x, largest position {max_weight:.1%}, about "
+        f"{effective_names:.0f} effective names; the result does not depend on a few names or days.")
+    return CheckResult("exposure", "Exposure and concentration", status, text, {
+        "max_gross_leverage": round(max_gross, 3),
+        "mean_gross_leverage": round(float(gross[active].mean()), 3) if active.any() else 0.0,
+        "mean_net_exposure": round(float(net_exposure[active].mean()), 3) if active.any() else 0.0,
+        "max_position_weight": round(max_weight, 4),
+        "median_effective_names": round(effective_names, 1),
+        "top5_names_pnl_share": None if top5_share is None else round(top5_share, 3),
+        "top5_names": [str(t) for t in pnl_by_name.nlargest(5).index] if total_pnl > 0 else [],
+        "net_log_return": round(total_log, 4),
+        "net_log_return_without_best_1pct_days": round(without_best, 4),
+    }, {"gross": gross, "net": net_exposure})
+
+
 def deflated_sharpe(net: pd.Series, gates: Gates) -> CheckResult:
     """Bailey & Lopez de Prado (2014): probability the true Sharpe exceeds what the best of
     n_trials random strategies would show by luck."""
@@ -166,13 +237,18 @@ def deflated_sharpe(net: pd.Series, gates: Gates) -> CheckResult:
     sr0 = sigma * expected_max
     prob = float(stats.norm.cdf((sr - sr0) / sigma))
     status = PASS if prob >= gates.min_deflated_sharpe_prob else (WARN if prob >= 0.5 else FAIL)
+    low, high = sharpe_interval(net, gates.periods_per_year, gates.bootstrap_block_days)
+    interval = (f" 95% interval for the annualized Sharpe: {low:.2f} to {high:.2f}."
+                if not math.isnan(low) else "")
     text = (f"Probability the edge is real after {n} declared trial(s): {prob:.1%} "
-            f"(gate {gates.min_deflated_sharpe_prob:.0%}).")
+            f"(gate {gates.min_deflated_sharpe_prob:.0%}).{interval}")
     return CheckResult("deflated_sharpe", "Overfitting (deflated Sharpe ratio)", status, text, {
         "n_trials": n, "observations": t, "annualized_sharpe": round(sr * np.sqrt(gates.periods_per_year), 3),
         "skew": round(skew, 3), "kurtosis": round(kurt, 3),
         "luck_threshold_annualized": round(sr0 * np.sqrt(gates.periods_per_year), 3),
         "probability_real": round(prob, 4),
+        "sharpe_ci95_low": None if math.isnan(low) else round(low, 3),
+        "sharpe_ci95_high": None if math.isnan(high) else round(high, 3),
     })
 
 

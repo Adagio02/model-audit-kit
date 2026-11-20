@@ -1,7 +1,7 @@
 # Model Audit Kit
 
 Independent validation of trading-strategy backtests. A client sends two CSV files
-(prices and their daily positions); the tool runs seven checks against gates fixed in
+(prices and their daily positions); the tool runs eight checks against gates fixed in
 advance and produces a one-page HTML report with a **PASS / CONDITIONAL / FAIL** verdict.
 
 | Check | Question it answers |
@@ -10,8 +10,9 @@ advance and produces a one-page HTML report with a **PASS / CONDITIONAL / FAIL**
 | Look-ahead / leakage | Does performance collapse when trades are delayed one day? |
 | Transaction-cost realism | Does the edge survive realistic costs? What is the break-even cost? |
 | Walk-forward stability | Is the edge positive in most time windows, or concentrated in one? |
-| Overfitting (deflated Sharpe) | Is the Sharpe still significant after the number of variants tried? |
+| Overfitting (deflated Sharpe) | Is the Sharpe still significant after the number of variants tried? (with a 95% bootstrap interval) |
 | Drawdown and tail risk | Is the worst loss inside the agreed limit? |
+| Exposure and concentration | Does the book respect the mandate's leverage and position limits? Do a few names or days carry the result? |
 | Benchmark value | Does it beat simply holding the benchmark? |
 
 ## Quick start (Windows PowerShell, in this folder)
@@ -31,7 +32,9 @@ Command line anywhere: `modelaudit run --prices p.csv --positions w.csv --gates 
 
 The same engine runs as an event-driven Azure pipeline: upload a batch to Blob Storage, an Azure
 Function audits it, results land in Azure SQL, Power BI/Fabric report on them, and a Microsoft
-Foundry model explains each failed check in plain English. Full plan: [docs/07-AZURE.md](docs/07-AZURE.md).
+Foundry model explains each failed check in plain English. A Copilot Studio agent ("Audit Desk")
+answers questions such as "what failed validation yesterday?" through a read-only API on the same
+Function App. Full plan: [docs/07-AZURE.md](docs/07-AZURE.md).
 
     powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1 -Azure
     powershell -ExecutionPolicy Bypass -File .\azure\scripts\run_local_pipeline.ps1    # try it with no Azure account
@@ -48,7 +51,7 @@ delistings and a benchmark) and four strategies that show what the audit catches
 | honest_momentum | PASS | Weekly momentum, decays gradually with delay, survives costs |
 | leaky_momentum | FAIL | Uses tomorrow's return by mistake: Sharpe 5.6 falls to 1.8 with one day of delay |
 | leaky_momentum_fixed | PASS | Same strategy with the bug fixed (`rets.shift(-1)` -> `rets`): Sharpe 1.68, the real edge |
-| high_turnover_reversal | FAIL | Real but tiny edge: Sharpe 1.6 before costs, 0.07 after 10 bps; 43% drawdown |
+| high_turnover_reversal | FAIL | Real but tiny edge: Sharpe 1.6 before costs, 0.07 after 10 bps; 43% drawdown; 5.4x gross leverage |
 
 The data is synthetic on purpose: nobody's real strategy is exposed, and the "right answer" is known.
 
@@ -56,7 +59,8 @@ The data is synthetic on purpose: nobody's real strategy is exposed, and the "ri
 
     src/modelaudit/   the engine (checks, report, CLI)
     src/modelaudit/cloud/  pipeline shared by CLI, Azure Function and Fabric (storage, SQL, AI explainer)
-    azure/            Function app, Bicep, SQL schema, deploy scripts, Fabric/Power BI/Copilot Studio guides
+    azure/            Function app (audit + agent API), Bicep, SQL schema, deploy scripts,
+                      Power BI queries/measures/theme, Copilot Studio API spec, instructions and test set
     demo/             synthetic market, gates and sample reports
     templates/        default gates, client data spec
     docs/             guides

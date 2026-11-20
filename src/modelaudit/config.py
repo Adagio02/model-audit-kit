@@ -22,6 +22,10 @@ class Gates:
     lookahead_min_decay_ratio: float = 0.30  # Sharpe(delay 2) / Sharpe(delay 1); a cliff signals look-ahead
     max_abs_daily_move: float = 0.5        # larger daily price moves suggest unadjusted splits or bad ticks
     max_missing_fraction: float = 0.05
+    max_gross_leverage: float = 3.0        # sum of |weights|; set from the client's mandate
+    max_position_weight: float = 0.10      # largest |weight| in a single name
+    max_top5_pnl_share: float = 0.5        # share of gross P&L allowed to come from the 5 best names
+    bootstrap_block_days: int = 20         # block length for the Sharpe confidence interval
     benchmark_ticker: str | None = None    # optional, e.g. "SPY" if present in prices
     labels: dict = field(default_factory=dict)
 

@@ -106,7 +106,7 @@
       "key": "deflated_sharpe",
       "title": "Overfitting (deflated Sharpe ratio)",
       "status": "FAIL",
-      "summary": "Probability the edge is real after 10 declared trial(s): 8.9% (gate 95%).",
+      "summary": "Probability the edge is real after 10 declared trial(s): 8.9% (gate 95%). 95% interval for the annualized Sharpe: -0.50 to 0.67.",
       "metrics": {
         "n_trials": 10,
         "observations": 2608,
@@ -114,7 +114,9 @@
         "skew": -0.027,
         "kurtosis": 3.262,
         "luck_threshold_annualized": 0.49,
-        "probability_real": 0.0894
+        "probability_real": 0.0894,
+        "sharpe_ci95_low": -0.503,
+        "sharpe_ci95_high": 0.669
       }
     },
     {
@@ -125,6 +127,29 @@
       "metrics": {
         "max_drawdown": -0.4305,
         "worst_day": -0.0412
+      }
+    },
+    {
+      "key": "exposure",
+      "title": "Exposure and concentration",
+      "status": "FAIL",
+      "summary": "gross leverage reaches 5.4x (limit 3x)",
+      "metrics": {
+        "max_gross_leverage": 5.429,
+        "mean_gross_leverage": 5.048,
+        "mean_net_exposure": 0.011,
+        "max_position_weight": 0.0714,
+        "median_effective_names": 79.6,
+        "top5_names_pnl_share": 0.26,
+        "top5_names": [
+          "STK39",
+          "STK51",
+          "STK23",
+          "STK66",
+          "STK24"
+        ],
+        "net_log_return": -0.0223,
+        "net_log_return_without_best_1pct_days": -0.7841
       }
     },
     {
@@ -160,14 +185,18 @@
     "lookahead_min_decay_ratio": 0.3,
     "max_abs_daily_move": 0.5,
     "max_missing_fraction": 0.05,
+    "max_gross_leverage": 3.0,
+    "max_position_weight": 0.1,
+    "max_top5_pnl_share": 0.5,
+    "bootstrap_block_days": 20,
     "benchmark_ticker": "SPY",
     "labels": {}
   },
   "manifest": {
-    "tool": "modelaudit 0.1.0",
-    "generated_utc": "2026-11-14T00:03:50+00:00",
-    "python": "3.12.10",
-    "pandas": "3.1.1",
+    "tool": "modelaudit 0.2.0",
+    "generated_utc": "2026-11-20T19:15:45+00:00",
+    "python": "3.13.18",
+    "pandas": "3.0.5",
     "inputs_sha256": {
       "prices.csv": "d98dcac709e7420c4635927a445a7524f81a3ca5d5d02ebd75860164fa74fa4e",
       "positions_high_turnover_reversal.csv": "9f9991f06a2672cca0d16b1faaf7236225406dd727990b8fd3c915b370388e1a",

@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from modelaudit.audit import AuditResult  # noqa: E402
-from modelaudit.data import sharpe  # noqa: E402
+from modelaudit.remediation import remediation  # noqa: E402
 
 INK, MUTED, LINE, ACCENT, BAD = "#1d2733", "#5b6776", "#d9dee5", "#1f6f8b", "#b23b3b"
 STATUS_COLOR = {"PASS": "#1e7b4f", "WARN": "#a86a00", "FAIL": "#b23b3b",
@@ -49,6 +49,19 @@ def _equity_chart(result: AuditResult) -> str:
     return _fig_to_data_uri(fig)
 
 
+def _exposure_chart(result: AuditResult) -> str:
+    series = next(c for c in result.checks if c.key == "exposure").series
+    fig, ax = plt.subplots(figsize=(7.2, 2.2))
+    ax.plot(series["gross"], color=ACCENT, linewidth=1.2, label="Gross (sum of |weights|)")
+    ax.plot(series["net"], color=MUTED, linewidth=1, label="Net (sum of weights)")
+    ax.axhline(result.gates.max_gross_leverage, color=BAD, linewidth=0.8, linestyle="--",
+               label=f"Gross limit {result.gates.max_gross_leverage:g}x")
+    ax.set_title("Exposure over time", loc="left", fontsize=10, color=INK)
+    ax.legend(frameon=False, fontsize=8, ncol=3)
+    _style(ax)
+    return _fig_to_data_uri(fig)
+
+
 def _bar_chart(labels, values, title, xlabel, highlight=None) -> str:
     fig, ax = plt.subplots(figsize=(3.5, 2.4))
     colors = [BAD if v < 0 else ACCENT for v in values]
@@ -69,6 +82,7 @@ def render_html(result: AuditResult) -> str:
     folds = by_key["walk_forward"].series["folds"]
     charts = {
         "equity": _equity_chart(result),
+        "exposure": _exposure_chart(result),
         "delay": _bar_chart(list(delays), list(delays.values()), "Sharpe vs execution delay", "days of delay"),
         "cost": _bar_chart([f"{k:g}" for k in grid], list(grid.values()), "Net Sharpe vs cost", "bps per trade"),
         "folds": _bar_chart([str(i + 1) for i in range(len(folds))], [f["sharpe"] for f in folds],
@@ -89,6 +103,17 @@ def render_html(result: AuditResult) -> str:
                      for k, v in result.manifest["inputs_sha256"].items()) or "<li>Not recorded</li>"
     gates = "".join(f"<li><code>{html.escape(k)}</code>: {html.escape(str(v))}</li>"
                     for k, v in result.gates.to_dict().items() if k != "labels")
+    order = {"FAIL": 0, "WARN": 1}
+    flagged = sorted((c for c in result.checks if c.status in order), key=lambda c: order[c.status])
+    fixes = "".join(
+        f"<li><span class='pill' style='background:{STATUS_COLOR[c.status]}'>{c.status}</span> "
+        f"<b>{html.escape(c.title)}.</b> {html.escape(remediation(c.key, c.summary)[1])}</li>"
+        for c in flagged)
+    fix_section = (f"<h2>What to fix first</h2><ol class='fixes'>{fixes}</ol>" if fixes else "")
+    deflated = by_key["deflated_sharpe"].metrics
+    interval = ("" if deflated.get("sharpe_ci95_low") is None else
+                f"<div class='kpi'><span>Net Sharpe 95% interval</span><strong>"
+                f"{deflated['sharpe_ci95_low']:.2f} to {deflated['sharpe_ci95_high']:.2f}</strong></div>")
     meaning = {
         "PASS": "No material problems were found under the stated gates.",
         "CONDITIONAL": "No disqualifying problem, but one or more checks need attention before relying on this backtest.",
@@ -117,6 +142,7 @@ def render_html(result: AuditResult) -> str:
  .charts {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; }}
  img {{ max-width:100%; }}
  ul {{ font-size:12px; color:var(--muted); padding-left:18px; }} code {{ font-size:11px; }}
+ .fixes {{ font-size:13px; color:var(--ink); }} .fixes li {{ margin-bottom:6px; }}
  .foot {{ margin-top:36px; font-size:11px; color:var(--muted); border-top:1px solid var(--line); padding-top:12px; }}
 </style></head><body>
 <h1>Strategy audit: {html.escape(result.strategy)}</h1>
@@ -127,10 +153,15 @@ def render_html(result: AuditResult) -> str:
  <div class="kpi"><span>Net Sharpe ({result.gates.cost_bps:g} bps)</span><strong>{head["net_sharpe"]:.2f}</strong></div>
  <div class="kpi"><span>Net total return</span><strong>{head["net_total_return"]:.1%}</strong></div>
  <div class="kpi"><span>Max drawdown</span><strong>{head["max_drawdown"]:.1%}</strong></div>
+ {interval}
 </div>
 <h2>Findings</h2><table>{rows}</table>
+<p class="sub">Verdict rule: any FAIL makes the verdict FAIL; otherwise any WARN makes it CONDITIONAL;
+otherwise PASS. The gates were fixed before the audit and are listed below.</p>
+{fix_section}
 <h2>Evidence</h2>
 <img src="{charts["equity"]}" alt="Growth of one dollar, gross, net and benchmark">
+<img src="{charts["exposure"]}" alt="Gross and net exposure over time">
 <div class="charts">
  <img src="{charts["delay"]}" alt="Sharpe ratio by execution delay">
  <img src="{charts["cost"]}" alt="Net Sharpe ratio by cost assumption">
@@ -141,6 +172,7 @@ def render_html(result: AuditResult) -> str:
  <li><b>Delay test:</b> a genuine signal loses performance gradually when trades are delayed. A collapse after one extra day means the backtest used information it would not have had.</li>
  <li><b>Costs:</b> the break-even cost is the trading cost at which the edge disappears. High turnover makes small edges fragile.</li>
  <li><b>Deflated Sharpe:</b> adjusts for how many variants were tried. The more variants, the higher the bar luck alone could clear.</li>
+ <li><b>Exposure and concentration:</b> checks the book against the mandate's leverage and position limits, and whether a few names or days produce most of the result.</li>
  <li><b>Time windows:</b> a reliable edge should be positive in most periods, not concentrated in one.</li>
 </ul>
 <h2>Method and reproducibility</h2>

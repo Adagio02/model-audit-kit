@@ -106,7 +106,7 @@
       "key": "deflated_sharpe",
       "title": "Overfitting (deflated Sharpe ratio)",
       "status": "PASS",
-      "summary": "Probability the edge is real after 10 declared trial(s): 100.0% (gate 95%).",
+      "summary": "Probability the edge is real after 10 declared trial(s): 100.0% (gate 95%). 95% interval for the annualized Sharpe: 4.78 to 6.07.",
       "metrics": {
         "n_trials": 10,
         "observations": 2608,
@@ -114,7 +114,9 @@
         "skew": 0.1,
         "kurtosis": 3.174,
         "luck_threshold_annualized": 0.497,
-        "probability_real": 1.0
+        "probability_real": 1.0,
+        "sharpe_ci95_low": 4.783,
+        "sharpe_ci95_high": 6.065
       }
     },
     {
@@ -125,6 +127,29 @@
       "metrics": {
         "max_drawdown": -0.042,
         "worst_day": -0.0139
+      }
+    },
+    {
+      "key": "exposure",
+      "title": "Exposure and concentration",
+      "status": "PASS",
+      "summary": "Gross leverage up to 2.8x, largest position 3.8%, about 80 effective names; the result does not depend on a few names or days.",
+      "metrics": {
+        "max_gross_leverage": 2.839,
+        "mean_gross_leverage": 2.558,
+        "mean_net_exposure": -0.02,
+        "max_position_weight": 0.0385,
+        "median_effective_names": 79.8,
+        "top5_names_pnl_share": 0.132,
+        "top5_names": [
+          "STK66",
+          "STK45",
+          "STK10",
+          "STK29",
+          "STK51"
+        ],
+        "net_log_return": 4.0257,
+        "net_log_return_without_best_1pct_days": 3.6479
       }
     },
     {
@@ -160,14 +185,18 @@
     "lookahead_min_decay_ratio": 0.3,
     "max_abs_daily_move": 0.5,
     "max_missing_fraction": 0.05,
+    "max_gross_leverage": 3.0,
+    "max_position_weight": 0.1,
+    "max_top5_pnl_share": 0.5,
+    "bootstrap_block_days": 20,
     "benchmark_ticker": "SPY",
     "labels": {}
   },
   "manifest": {
-    "tool": "modelaudit 0.1.0",
-    "generated_utc": "2026-11-14T00:03:47+00:00",
-    "python": "3.12.10",
-    "pandas": "3.1.1",
+    "tool": "modelaudit 0.2.0",
+    "generated_utc": "2026-11-20T19:15:40+00:00",
+    "python": "3.13.18",
+    "pandas": "3.0.5",
     "inputs_sha256": {
       "prices.csv": "d98dcac709e7420c4635927a445a7524f81a3ca5d5d02ebd75860164fa74fa4e",
       "positions_leaky_momentum.csv": "05b0c3d36a2019eec8a3188b3415f499db6e9abef99b3b72e27b9a094d0b96f1",

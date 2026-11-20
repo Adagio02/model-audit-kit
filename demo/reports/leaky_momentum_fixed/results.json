@@ -1,0 +1,207 @@
+{
+  "strategy": "leaky_momentum_fixed",
+  "verdict": "PASS",
+  "headline": {
+    "gross_sharpe": 1.822,
+    "net_sharpe": 1.677,
+    "net_total_return": 2.7326,
+    "max_drawdown": -0.1015
+  },
+  "checks": [
+    {
+      "key": "data_integrity",
+      "title": "Data integrity",
+      "status": "PASS",
+      "summary": "No integrity problems found.",
+      "metrics": {
+        "tickers": 81,
+        "dates": 2609,
+        "start": "2015-01-01",
+        "end": "2024-12-31",
+        "tickers_entering": 10,
+        "tickers_leaving": 10,
+        "missing_fraction": 0.0,
+        "large_moves": 0,
+        "duplicate_price_rows": 0,
+        "duplicate_position_rows": 0
+      }
+    },
+    {
+      "key": "lookahead",
+      "title": "Look-ahead / leakage (delay test)",
+      "status": "PASS",
+      "summary": "Performance decays gradually with execution delay, as expected for a genuine signal.",
+      "metrics": {
+        "sharpe_by_delay": {
+          "1": 1.822,
+          "2": 1.926,
+          "3": 1.871,
+          "5": 1.833
+        },
+        "decay_ratio_delay2_over_delay1": 1.057
+      }
+    },
+    {
+      "key": "costs",
+      "title": "Transaction-cost realism",
+      "status": "PASS",
+      "summary": "Net Sharpe 1.68 at 10 bps (gate 0.5); daily turnover 4.5%; break-even cost 125.6 bps.",
+      "metrics": {
+        "daily_turnover": 0.0447,
+        "annual_turnover": 11.27,
+        "breakeven_cost_bps": 125.6,
+        "net_sharpe_at_gate_cost": 1.677,
+        "sharpe_by_cost_bps": {
+          "0": 1.822,
+          "5": 1.749,
+          "10": 1.677,
+          "25": 1.459,
+          "50": 1.095
+        }
+      }
+    },
+    {
+      "key": "walk_forward",
+      "title": "Stability across time (walk-forward windows)",
+      "status": "PASS",
+      "summary": "100% of 5 sequential windows are profitable after costs (gate 60%); worst window Sharpe 1.12.",
+      "metrics": {
+        "positive_fraction": 1.0,
+        "worst_fold_sharpe": 1.117,
+        "folds": [
+          {
+            "start": "2015-01-02",
+            "end": "2016-12-30",
+            "sharpe": 1.492,
+            "return": 0.241
+          },
+          {
+            "start": "2017-01-02",
+            "end": "2019-01-01",
+            "sharpe": 2.67,
+            "return": 0.5395
+          },
+          {
+            "start": "2019-01-02",
+            "end": "2020-12-30",
+            "sharpe": 1.497,
+            "return": 0.2596
+          },
+          {
+            "start": "2020-12-31",
+            "end": "2022-12-30",
+            "sharpe": 1.117,
+            "return": 0.1905
+          },
+          {
+            "start": "2023-01-02",
+            "end": "2024-12-31",
+            "sharpe": 1.588,
+            "return": 0.3029
+          }
+        ]
+      }
+    },
+    {
+      "key": "deflated_sharpe",
+      "title": "Overfitting (deflated Sharpe ratio)",
+      "status": "PASS",
+      "summary": "Probability the edge is real after 10 declared trial(s): 100.0% (gate 95%). 95% interval for the annualized Sharpe: 1.09 to 2.28.",
+      "metrics": {
+        "n_trials": 10,
+        "observations": 2608,
+        "annualized_sharpe": 1.677,
+        "skew": 0.019,
+        "kurtosis": 3.174,
+        "luck_threshold_annualized": 0.491,
+        "probability_real": 0.9999,
+        "sharpe_ci95_low": 1.09,
+        "sharpe_ci95_high": 2.278
+      }
+    },
+    {
+      "key": "risk",
+      "title": "Drawdown and tail risk",
+      "status": "PASS",
+      "summary": "Maximum drawdown -10.2% (gate -25%); worst day -2.2%.",
+      "metrics": {
+        "max_drawdown": -0.1015,
+        "worst_day": -0.0223
+      }
+    },
+    {
+      "key": "exposure",
+      "title": "Exposure and concentration",
+      "status": "PASS",
+      "summary": "Gross leverage up to 2.8x, largest position 3.8%, about 80 effective names; the result does not depend on a few names or days.",
+      "metrics": {
+        "max_gross_leverage": 2.833,
+        "mean_gross_leverage": 2.558,
+        "mean_net_exposure": -0.016,
+        "max_position_weight": 0.0385,
+        "median_effective_names": 79.9,
+        "top5_names_pnl_share": 0.259,
+        "top5_names": [
+          "STK66",
+          "STK07",
+          "STK10",
+          "STK58",
+          "STK47"
+        ],
+        "net_log_return": 1.3171,
+        "net_log_return_without_best_1pct_days": 0.9473
+      }
+    },
+    {
+      "key": "benchmark",
+      "title": "Value over a simple benchmark",
+      "status": "PASS",
+      "summary": "Information ratio vs SPY: 0.44; beta -0.03; strategy Sharpe 1.68 vs benchmark 0.32.",
+      "metrics": {
+        "benchmark": "SPY",
+        "information_ratio": 0.436,
+        "beta": -0.031,
+        "benchmark_sharpe": 0.315
+      }
+    }
+  ],
+  "gates": {
+    "periods_per_year": 252,
+    "cost_bps": 10,
+    "cost_grid_bps": [
+      0,
+      5,
+      10,
+      25,
+      50
+    ],
+    "min_net_sharpe": 0.5,
+    "max_drawdown": -0.25,
+    "folds": 5,
+    "min_positive_fold_fraction": 0.6,
+    "n_trials": 10,
+    "min_deflated_sharpe_prob": 0.95,
+    "lookahead_max_sharpe": 4.0,
+    "lookahead_min_decay_ratio": 0.3,
+    "max_abs_daily_move": 0.5,
+    "max_missing_fraction": 0.05,
+    "max_gross_leverage": 3.0,
+    "max_position_weight": 0.1,
+    "max_top5_pnl_share": 0.5,
+    "bootstrap_block_days": 20,
+    "benchmark_ticker": "SPY",
+    "labels": {}
+  },
+  "manifest": {
+    "tool": "modelaudit 0.2.0",
+    "generated_utc": "2026-11-20T19:15:43+00:00",
+    "python": "3.13.18",
+    "pandas": "3.0.5",
+    "inputs_sha256": {
+      "prices.csv": "d98dcac709e7420c4635927a445a7524f81a3ca5d5d02ebd75860164fa74fa4e",
+      "positions_leaky_momentum_fixed.csv": "c5acef78e7e65e4260208968052f033739cca9455a6facde7d3e29a2b3096884",
+      "gates.json": "710cd60fb477638d8bfdf177088e640632fe95303d95dfbda92646b48a9beea6"
+    },
+    "contract": "Weights are decided at the close of each date using only information available then, and earn the next period's return."
+  }
+}

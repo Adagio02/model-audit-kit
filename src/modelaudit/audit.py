@@ -70,6 +70,7 @@ def run_audit(prices: pd.DataFrame, positions: pd.DataFrame, gates: Gates,
         c.walk_forward(net, gates),
         c.deflated_sharpe(net, gates),
         c.risk(net, gates),
+        c.exposure(weights, returns, net, gates),
         c.benchmark(net, returns, gates),
     ]
     manifest = {
